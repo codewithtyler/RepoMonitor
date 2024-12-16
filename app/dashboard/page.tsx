@@ -1,4 +1,3 @@
-import { UserGreeting } from '@/components/dashboard/user-greeting';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { GitPullRequest, Search, Settings, Star } from 'lucide-react';
 
@@ -32,10 +31,6 @@ const stats = [
 export default function DashboardPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <UserGreeting />
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.title}>
@@ -62,7 +57,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Getting Started</CardTitle>
             <CardDescription>
-              Welcome to your GitHub Issue Manager dashboard. To get started:
+              Welcome to your RepoMonitor dashboard. To get started:
               <ul className="list-disc pl-4 mt-2 space-y-1">
                 <li>Connect your GitHub repositories</li>
                 <li>Set up issue monitoring rules</li>

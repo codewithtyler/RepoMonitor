@@ -3,7 +3,7 @@ import { Sidebar } from '@/components/sidebar';
 
 export function DashboardContainer({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-[#111827]">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <Header />

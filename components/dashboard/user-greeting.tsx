@@ -1,6 +1,7 @@
 'use client';
 
 import { useUser } from '@/lib/auth/hooks';
+import Image from 'next/image';
 
 export function UserGreeting() {
   const { user, loading } = useUser();
@@ -23,10 +24,12 @@ export function UserGreeting() {
   return (
     <div className="flex items-center gap-3">
       {user.user_metadata?.avatar_url ? (
-        <img
+        <Image
           src={user.user_metadata.avatar_url}
           alt={user.user_metadata?.name || 'User'}
-          className="h-10 w-10 rounded-full"
+          className="rounded-full"
+          width={40}
+          height={40}
         />
       ) : (
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
