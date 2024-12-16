@@ -1,29 +1,31 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 let supabaseInstance: SupabaseClient | null = null;
+
+export const createClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    console.error('Missing Supabase credentials');
+    return null;
+  }
+
+  return createSupabaseClient(url, key, {
+    auth: {
+      persistSession: true,
+      detectSessionInUrl: true,
+      autoRefreshToken: true
+    }
+  });
+};
 
 export function getSupabaseClient() {
   if (supabaseInstance) {
     return supabaseInstance;
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    return null;
-  }
-
-  supabaseInstance = createClient(url, key, {
-    auth: {
-      flowType: 'implicit',
-      persistSession: true,
-      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-      detectSessionInUrl: true,
-      autoRefreshToken: true
-    },
-  });
-
+  supabaseInstance = createClient();
   return supabaseInstance;
 }

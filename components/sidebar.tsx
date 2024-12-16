@@ -1,5 +1,6 @@
 import { Home, Settings, GitPullRequest, Search } from 'lucide-react';
 import Link from 'next/link';
+import { HeaderLogo } from '@/components/layout/header-logo';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -10,29 +11,22 @@ const navigation = [
 
 export function Sidebar() {
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-40 lg:flex lg:w-72 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-border bg-card px-6 pb-4">
-        <nav className="flex flex-1 flex-col pt-8">
-          <ul role="list" className="flex flex-1 flex-col gap-y-7">
-            <li>
-              <ul role="list" className="-mx-2 space-y-1">
-                {navigation.map((item) => (
-                  <li key={item.name}>
-                    <Link
-                      href={item.href}
-                      className="group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-foreground hover:bg-muted"
-                    >
-                      <item.icon
-                        className="h-5 w-5 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      {item.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          </ul>
+    <div className="w-64 border-r bg-card flex flex-col">
+      <div className="h-14 border-b flex items-center px-4">
+        <HeaderLogo />
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <nav className="space-y-1 p-4">
+          {navigation.map((item) => (
+            <Link
+              key={item.name}
+              href={item.href}
+              className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <item.icon className="h-4 w-4" />
+              {item.name}
+            </Link>
+          ))}
         </nav>
       </div>
     </div>
