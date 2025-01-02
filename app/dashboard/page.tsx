@@ -44,9 +44,9 @@ export default function DashboardPage() {
               <CardDescription className="text-2xl font-bold">
                 {stat.value}
               </CardDescription>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {stat.description}
-              </p>
+              </div>
             </CardHeader>
           </Card>
         ))}
@@ -56,15 +56,17 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Getting Started</CardTitle>
-            <CardDescription>
-              Welcome to your RepoMonitor dashboard. To get started:
-              <ul className="list-disc pl-4 mt-2 space-y-1">
+            <div className="mt-2">
+              <div className="text-sm text-muted-foreground">
+                Welcome to your RepoMonitor dashboard. To get started:
+              </div>
+              <ul className="list-disc pl-4 mt-2 space-y-1 text-sm text-muted-foreground">
                 <li>Connect your GitHub repositories</li>
                 <li>Set up issue monitoring rules</li>
                 <li>Configure automated responses</li>
                 <li>Create custom search filters</li>
               </ul>
-            </CardDescription>
+            </div>
           </CardHeader>
         </Card>
       </div>

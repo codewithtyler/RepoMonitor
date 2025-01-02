@@ -1,27 +1,31 @@
 import { HomeContainer } from '@/components/layout/home-container';
 import { AuthButton } from '@/components/layout/auth-button';
-import { Github, Sparkles, Zap, GitPullRequest, Search, Bot, Heart, Copy } from 'lucide-react';
+import { Github, Sparkles, Zap, GitPullRequest, Search, Bot, Heart } from 'lucide-react';
 
 const features = [
   {
     icon: Sparkles,
     title: 'AI-Powered Analysis',
-    description: 'Automatically detect duplicate issues and suggest relevant labels using advanced AI.'
+    description: 'Automatically detect duplicate issues and suggest relevant labels using advanced AI.',
+    iconClassName: 'text-gray-300'
   },
   {
     icon: Zap,
     title: 'Batch Actions',
-    description: 'Efficiently manage multiple issues at once with powerful batch operations.'
+    description: 'Efficiently manage multiple issues at once with powerful batch operations.',
+    iconClassName: 'text-gray-300'
   },
   {
     icon: Search,
     title: 'Smart Search',
-    description: 'Find similar issues instantly with semantic search capabilities.'
+    description: 'Find similar issues instantly with semantic search capabilities.',
+    iconClassName: 'text-gray-300'
   },
   {
     icon: Bot,
     title: 'Automated Workflows',
-    description: 'Set up custom automation rules to streamline your workflow.'
+    description: 'Set up custom automation rules to streamline your workflow.',
+    iconClassName: 'text-gray-300'
   }
 ];
 
@@ -30,7 +34,7 @@ export default function Home() {
     <HomeContainer>
       <div className="w-full max-w-6xl space-y-12">
         <div className="text-center space-y-4">
-          <Github className="h-12 w-12 text-primary mx-auto" />
+          <Github className="h-12 w-12 text-gray-300 mx-auto" />
           <div className="space-y-4 max-w-2xl mx-auto">
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
               RepoMonitor
@@ -59,11 +63,11 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <div className={`flex items-center ${
                   index === 0 ? 'text-orange-500' :
-                  index === 1 ? 'bg-amber-500/10 text-amber-500' : 
+                  index === 1 ? 'bg-amber-500/10 text-amber-500' :
                   index === 2 ? 'bg-red-600/10 text-red-500' :
                   'bg-pink-700/10 text-pink-500'
                 }`} style={{ background: 'none' }}>
-                  <feature.icon className="h-8 w-8" />
+                  <feature.icon className={`h-6 w-6 ${feature.iconClassName}`} />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">
