@@ -30,13 +30,13 @@ const stats = [
 
 export function DashboardPage() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div 
+          <div
             key={stat.title}
             className="p-6 rounded-lg border"
-            style={{ 
+            style={{
               backgroundColor: theme.colors.background.secondary,
               borderColor: theme.colors.border.primary
             }}
@@ -58,7 +58,7 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-8">
-        <div className="rounded-lg border" style={{ 
+        <div className="rounded-lg border" style={{
           backgroundColor: theme.colors.background.secondary,
           borderColor: theme.colors.border.primary
         }}>
