@@ -2,8 +2,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { DashboardLayout } from '../components/layout/dashboard-container';
 import { HomePage } from '../pages/Home';
 import { DashboardPage } from '../pages/Dashboard';
-import { AuthCallback } from '@/pages/auth/callback';
-import { ProtectedRoute } from '@/components/auth/protected-route';
+import { AuthCallback } from '../pages/auth/callback';
+import { ProtectedRoute } from '../components/auth/protected-route';
 
 const router = createBrowserRouter([
   {

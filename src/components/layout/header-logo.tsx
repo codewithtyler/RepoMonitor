@@ -1,6 +1,6 @@
 import { Github } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { theme } from '@/config/theme';
+import { theme } from '../../config/theme';
 
 export function HeaderLogo() {
   return (
@@ -11,4 +11,4 @@ export function HeaderLogo() {
       </Link>
     </div>
   );
-} 
+}

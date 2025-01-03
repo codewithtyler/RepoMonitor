@@ -1,10 +1,10 @@
-import { theme } from '@/config/theme';
+import { theme } from '../../config/theme';
 
 export function Footer() {
   return (
-    <footer 
-      className="w-full border-t py-6" 
-      style={{ 
+    <footer
+      className="w-full border-t py-6"
+      style={{
         backgroundColor: theme.colors.background.primary,
         borderColor: theme.colors.border.primary
       }}
@@ -14,4 +14,4 @@ export function Footer() {
       </div>
     </footer>
   );
-} 
+}

@@ -1,10 +1,10 @@
 import * as React from 'react';
 import { HeaderLogo } from './header-logo';
-import { theme } from '@/config/theme';
-import { useUser } from '@/lib/auth/hooks';
+import { theme } from '../../config/theme';
+import { useUser } from '../../lib/auth/hooks';
 import { ChevronDown, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import { supabase } from '@/lib/auth/supabase-client';
+import { supabase } from '../../lib/auth/supabase-client';
 import { useNavigate } from 'react-router-dom';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,5 @@
 import { GitPullRequest, Search, Settings, Star } from 'lucide-react';
-import { theme } from '@/config/theme';
+import { theme } from '../config/theme';
 
 const stats = [
   {

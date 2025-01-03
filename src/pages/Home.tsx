@@ -1,7 +1,7 @@
 import { Github, Sparkles, Zap, Search, Box } from 'lucide-react';
-import { Footer } from '@/components/layout/footer';
-import { theme } from '@/config/theme';
-import { supabase } from '@/lib/auth/supabase-client';
+import { Footer } from '../components/layout/footer';
+import { theme } from '../config/theme';
+import { supabase } from '../lib/auth/supabase-client';
 
 export function HomePage() {
   const handleGitHubSignIn = async () => {
