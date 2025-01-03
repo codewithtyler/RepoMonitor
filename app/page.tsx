@@ -1,6 +1,7 @@
-import { HomeContainer } from '@/components/layout/home-container';
-import { AuthButton } from '@/components/layout/auth-button';
-import { Github, Sparkles, Zap, GitPullRequest, Search, Bot, Heart } from 'lucide-react';
+import React from 'react';
+import { HomeContainer } from '../components/layout/home-container';
+import { AuthButton } from '../components/layout/auth-button';
+import { Github, Sparkles, Zap, Search, Bot, Heart } from 'lucide-react';
 
 const features = [
   {

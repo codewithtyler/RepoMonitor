@@ -1,4 +1,5 @@
-import { DashboardContainer } from '@/components/layout/dashboard-container';
+import * as React from 'react';
+import { DashboardContainer } from '../../components/layout/dashboard-container';
 
 export default function DashboardLayout({
   children,

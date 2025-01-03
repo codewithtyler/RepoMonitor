@@ -1,14 +1,6 @@
-import './globals.css';
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import { Providers } from '@/components/providers';
-
-const inter = Inter({ subsets: ['latin'] });
-
-export const metadata: Metadata = {
-  title: 'RepoMonitor',
-  description: 'AI-powered GitHub repository monitoring and management',
-};
+import React from 'react';
+import { ThemeProvider } from '../src/components/theme-provider';
+import '../src/styles/index.css';
 
 export default function RootLayout({
   children,
@@ -16,11 +8,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className} suppressHydrationWarning>
-        <Providers>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <title>RepoMonitor</title>
+        <meta name="description" content="Monitor and manage your GitHub repositories" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
+      <body>
+        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
           {children}
-        </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

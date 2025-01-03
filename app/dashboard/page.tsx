@@ -1,4 +1,5 @@
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { GitPullRequest, Search, Settings, Star } from 'lucide-react';
 
 const stats = [

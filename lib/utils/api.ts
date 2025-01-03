@@ -1,21 +1,21 @@
 import { CACHE_TTL } from './constants';
+import { getBaseUrl } from './url';
 
 export async function fetchWithRetry<T>(
   url: string,
-  options: RequestInit,
-  retries = 3,
-  backoff = 1000
+  options: globalThis.RequestInit = {},
+  retries = 3
 ): Promise<T> {
   try {
     const response = await fetch(url, options);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return await response.json();
+    return response.json();
   } catch (error) {
     if (retries > 0) {
-      await new Promise(resolve => setTimeout(resolve, backoff));
-      return fetchWithRetry<T>(url, options, retries - 1, backoff * 2);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return fetchWithRetry(url, options, retries - 1);
     }
     throw error;
   }
@@ -44,4 +44,13 @@ export async function getCachedData<T>(
     JSON.stringify({ data: fresh, timestamp: Date.now() })
   );
   return fresh;
+}
+
+export async function fetchApi(path: string, init?: globalThis.RequestInit) {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, init);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
 }

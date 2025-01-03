@@ -1,8 +1,17 @@
 {
-  "extends": "next/core-web-vitals",
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "plugins": ["react", "react-hooks", "@typescript-eslint"],
   "rules": {
-    "no-trailing-spaces": "error",
-    "eol-last": ["error", "always"],
-    "no-multiple-empty-lines": ["error", { "max": 1, "maxEOF": 0 }]
+    "react/react-in-jsx-scope": "off"
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
   }
 }

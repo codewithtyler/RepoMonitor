@@ -1,14 +1,15 @@
-'use client';
-
+import * as React from 'react';
 import { useEffect } from 'react';
+
+interface DashboardErrorProps {
+  error: Error & { digest?: string };
+  reset: () => void;
+}
 
 export default function DashboardError({
   error,
   reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+}: DashboardErrorProps) {
   useEffect(() => {
     console.error(error);
   }, [error]);

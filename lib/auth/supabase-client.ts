@@ -1,10 +1,8 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
+import { url, key } from './env';
 
-let supabase: ReturnType<typeof createClientComponentClient> | null = null;
+let supabase = createClient(url, key);
 
 export function getSupabaseClient() {
-  if (!supabase) {
-    supabase = createClientComponentClient();
-  }
   return supabase;
 }

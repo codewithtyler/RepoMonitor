@@ -1,15 +1,11 @@
-/**
- * Validates the authentication configuration from environment variables
- */
-export function validateAuthConfig() {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Get environment variables
+const url = import.meta.env.VITE_SUPABASE_URL;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-    if (process.env.NODE_ENV === 'development' && (!url || !key)) {
-        console.warn(
-            'Warning: Supabase credentials missing. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env'
-        );
-    }
-
-    return { url, key };
+if (!url || !key) {
+  throw new Error(
+    'Warning: Supabase credentials missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env'
+  );
 }
+
+export { url, key };
