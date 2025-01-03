@@ -1,12 +1,16 @@
+import { theme } from '@/config/theme';
+
 export function Footer() {
   return (
-    <footer className="border-t py-6 md:py-0">
-      <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
-        <div className="flex flex-col items-center gap-4 px-8 md:flex-row md:gap-2 md:px-0">
-          <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
-            Built with React, Vite, and Tailwind CSS
-          </p>
-        </div>
+    <footer 
+      className="w-full border-t py-6" 
+      style={{ 
+        backgroundColor: theme.colors.background.primary,
+        borderColor: theme.colors.border.primary
+      }}
+    >
+      <div className="container mx-auto text-center text-sm" style={{ color: theme.colors.text.secondary }}>
+        <p>Copyright © 2025 RepoMonitor • Maintained by Tyler Hughes</p>
       </div>
     </footer>
   );

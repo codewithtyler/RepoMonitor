@@ -36,4 +36,4 @@ export function useUser() {
   }, [navigate]);
 
   return { user, loading };
-} 
+}

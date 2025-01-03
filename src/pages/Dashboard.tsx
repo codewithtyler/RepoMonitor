@@ -1,4 +1,5 @@
 import { GitPullRequest, Search, Settings, Star } from 'lucide-react';
+import { theme } from '@/config/theme';
 
 const stats = [
   {
@@ -34,18 +35,22 @@ export function DashboardPage() {
         {stats.map((stat) => (
           <div 
             key={stat.title}
-            className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700"
+            className="p-6 rounded-lg border"
+            style={{ 
+              backgroundColor: theme.colors.background.secondary,
+              borderColor: theme.colors.border.primary
+            }}
           >
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <h3 className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
                 {stat.title}
               </h3>
-              <stat.icon className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+              <stat.icon className="h-5 w-5" style={{ color: theme.colors.text.secondary }} />
             </div>
-            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+            <p className="mt-2 text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
               {stat.value}
             </p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs" style={{ color: theme.colors.text.secondary }}>
               {stat.description}
             </p>
           </div>
@@ -53,15 +58,18 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="rounded-lg border" style={{ 
+          backgroundColor: theme.colors.background.secondary,
+          borderColor: theme.colors.border.primary
+        }}>
           <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
               Getting Started
             </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-2 text-sm" style={{ color: theme.colors.text.secondary }}>
               Welcome to your RepoMonitor dashboard. To get started:
             </p>
-            <ul className="list-disc pl-6 mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+            <ul className="list-disc pl-6 mt-4 space-y-2 text-sm" style={{ color: theme.colors.text.secondary }}>
               <li>Connect your GitHub repositories</li>
               <li>Set up issue monitoring rules</li>
               <li>Configure automated responses</li>
