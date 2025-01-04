@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "lint": "tsc --noEmit && eslint .",
+    "preview": "vite preview",
+    "migrate": "node migrations/run-migrations.js",
+    "combine-migrations": "node migrations/combine-migrations.js"
   },
   "dependencies": {
+    "@octokit/core": "^5.2.0",
+    "@octokit/plugin-rest-endpoint-methods": "^13.2.6",
+    "@octokit/rest": "^20.0.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-avatar": "^1.0.4",
     "@radix-ui/react-checkbox": "^1.0.4",
@@ -33,12 +38,16 @@
     "@radix-ui/react-toggle": "^1.0.3",
     "@radix-ui/react-toggle-group": "^1.0.4",
     "@radix-ui/react-tooltip": "^1.0.7",
-    "@supabase/supabase-js": "^2.39.1",
+    "@supabase/supabase-js": "^2.47.10",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "cmdk": "^0.2.0",
+    "cross-fetch": "^4.1.0",
+    "dotenv": "^16.4.7",
     "embla-carousel-react": "^8.0.0-rc17",
+    "limiter": "^2.1.0",
     "lucide-react": "^0.303.0",
+    "openai": "^4.24.1",
     "react": "^18.2.0",
     "react-day-picker": "^8.9.1",
     "react-dom": "^18.2.0",
@@ -52,6 +61,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^8.55.0",
+    "@octokit/types": "^12.4.0",
+    "@types/deno": "latest",
     "@types/node": "^22.10.4",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
@@ -66,6 +77,7 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8"
+    "vite": "^5.0.8",
+    "vite-plugin-node-polyfills": "^0.22.0"
   }
 }

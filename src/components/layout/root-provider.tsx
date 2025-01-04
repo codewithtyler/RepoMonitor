@@ -1,19 +1,12 @@
 import * as React from 'react';
-import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from 'sonner';
-import { cn } from '@/lib/utils';
 
-interface RootProviderProps {
-  children: React.ReactNode;
-}
+interface RootProviderProps extends React.HTMLAttributes<HTMLDivElement> {}
 
-export function RootProvider({ children }: RootProviderProps) {
+export function RootProvider({ className = '', ...props }: RootProviderProps) {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="app-theme">
-      <div className={cn("min-h-screen bg-background antialiased")}>
-        {children}
-      </div>
+    <div className={`min-h-screen bg-gray-50 ${className}`} {...props}>
       <Toaster />
-    </ThemeProvider>
+    </div>
   );
-} 
+}

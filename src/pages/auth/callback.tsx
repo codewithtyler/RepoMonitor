@@ -1,50 +1,54 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/auth/supabase-client';
+import { GitHubTokenManager } from '../../lib/auth/github-token-manager';
+import { theme } from '@/config/theme';
 
 export function AuthCallback() {
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Current session:', session);
-      if (session) {
-        console.log('Session exists, redirecting to dashboard...');
-        navigate('/dashboard', { replace: true });
+    const handleCallback = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) throw sessionError;
+        if (!session) throw new Error('No session found');
+
+        // Get the GitHub token from the session
+        const githubToken = session.provider_token;
+        const userId = session.user.id;
+
+        if (!githubToken) {
+          throw new Error('No GitHub token found in session');
+        }
+
+        // Use the token manager to handle the OAuth token
+        await GitHubTokenManager.handleOAuthToken(githubToken, userId);
+
+        // Navigate to the dashboard on success
+        navigate('/dashboard');
+      } catch (err) {
+        console.error('Error in callback:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
       }
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth State Change:', {
-        event,
-        user: session?.user,
-        metadata: session?.user?.user_metadata,
-        provider: session?.user?.app_metadata?.provider
-      });
-
-      if (event === 'SIGNED_IN') {
-        console.log('SIGNED_IN event detected, redirecting to dashboard...');
-        navigate('/dashboard', { replace: true });
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
+
+    handleCallback();
   }, [navigate]);
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="text-center">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Completing sign in...
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Please wait while we verify your credentials.
-        </p>
+  if (error) {
+    return (
+      <div style={{ color: theme.colors.error.primary, padding: '20px' }}>
+        Error: {error}
       </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '20px' }}>
+      Logging you in...
     </div>
   );
-} 
+}

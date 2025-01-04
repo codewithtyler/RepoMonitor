@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window", "deno.ns"],
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "lint": {
+    "files": {
+      "include": ["supabase/functions/"]
+    },
+    "rules": {
+      "exclude": ["no-explicit-any", "require-await", "no-unused-vars"]
+    }
+  },
+  "fmt": {
+    "files": {
+      "include": ["supabase/functions/"]
+    }
+  }
+} 

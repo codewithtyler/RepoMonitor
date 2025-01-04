@@ -18,10 +18,14 @@ export function AuthPage() {
 
   const handleGitHubSignIn = async () => {
     try {
+      // Sign out first to clear any existing sessions
+      await supabase.auth.signOut();
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'repo read:user'
         }
       });
 

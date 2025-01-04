@@ -1,17 +1,12 @@
-import * as React from 'react';
-import { cn } from '../../lib/utils';
-import { Footer } from './footer';
+import * as React from "react";
 
-export function HomeContainer({ children }: { children: React.ReactNode }) {
+interface HomeContainerProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+export function HomeContainer({ className = '', ...props }: HomeContainerProps) {
   return (
-    <div className={cn(
-      "flex min-h-screen flex-col",
-      "px-4 py-8 md:px-6 lg:px-8"
-    )}>
-      <div className="flex-1 w-full flex flex-col items-center">
-        {children}
-      </div>
-      <Footer />
-    </div>
+    <div
+      className={`flex min-h-screen flex-col items-center justify-center ${className}`}
+      {...props}
+    />
   );
 }

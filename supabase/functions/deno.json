@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "importMap": {
+    "imports": {
+      "openai": "https://esm.sh/openai@4.24.1",
+      "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.1"
+    }
+  }
+} 
