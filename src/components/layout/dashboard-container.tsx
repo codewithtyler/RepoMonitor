@@ -216,6 +216,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 alt={firstName}
                 className="h-8 w-8 rounded-full"
               />
+              <span className="text-sm">Hey {firstName}</span>
               <ChevronDown className="h-4 w-4" />
             </button>
 
