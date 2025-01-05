@@ -5,16 +5,12 @@ import { theme } from '@/config/theme';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { GitHubClient } from '@/lib/github';
-import type { RestEndpointMethodTypes } from '@octokit/rest';
 
 interface IssueProcessorProps {
   repositoryId: string;
   owner: string;
   name: string;
 }
-
-type GitHubIssue = RestEndpointMethodTypes['issues']['listForRepo']['response']['data'][number];
-type GitHubLabel = GitHubIssue['labels'][number];
 
 interface Issue {
   id: number;
@@ -54,13 +50,20 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
             page
           });
 
-          const pageIssues = response.data.map((issue: GitHubIssue): Issue => ({
+          const pageIssues = response.data.map((issue: {
+            id: number;
+            number: number;
+            title: string;
+            body: string | null;
+            state: string;
+            labels: Array<{ name: string } | string>;
+          }): Issue => ({
             id: issue.id,
             number: issue.number,
             title: issue.title,
             body: issue.body || '',
-            labels: issue.labels.map((label: GitHubLabel) => ({
-              name: typeof label === 'string' ? label : label.name || 'unknown'
+            labels: issue.labels.map(label => ({
+              name: typeof label === 'string' ? label : label.name
             })),
             state: issue.state
           }));

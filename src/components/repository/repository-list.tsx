@@ -5,12 +5,9 @@ import { theme } from '@/config/theme';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/auth/supabase-client';
 import type { GitHubClient } from '@/lib/github';
-import type { RestEndpointMethodTypes } from '@octokit/rest';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { useSearch } from '@/lib/contexts/search-context';
-
-type GitHubRepository = RestEndpointMethodTypes['repos']['listForAuthenticatedUser']['response']['data'][number];
 
 interface Repository {
   id: number;
@@ -41,7 +38,14 @@ export function RepositoryList() {
           searchQuery: searchQuery
         });
         console.log('Repositories response:', response);
-        return response.map((repo: GitHubRepository): Repository => ({
+        return response.map((repo: {
+          id: number;
+          name: string;
+          owner: { login: string };
+          private: boolean;
+          description: string | null;
+          updated_at: string | null;
+        }): Repository => ({
           id: repo.id,
           name: repo.name,
           owner: {
