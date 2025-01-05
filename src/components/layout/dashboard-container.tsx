@@ -2,10 +2,10 @@ import * as React from 'react';
 import { HeaderLogo } from './header-logo';
 import { theme } from '../../config/theme';
 import { useUser } from '../../lib/auth/hooks';
-import { ChevronDown, LogOut, GitFork, Search, RefreshCw } from 'lucide-react';
+import { ChevronDown, LogOut, GitFork, Search, RefreshCw, GitPullRequest, Settings, Star, LucideIcon } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/auth/supabase-client';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { useSearch } from '@/lib/contexts/search-context';
 import { SearchResultsDropdown } from '../search/search-results-dropdown';
@@ -14,6 +14,7 @@ import { toast } from '../../hooks/use-toast';
 import { useRecentRepositories } from '@/lib/hooks/use-recent-repositories';
 import { IssueProcessor } from '@/components/repository/issue-processor';
 import { motion, AnimatePresence } from 'framer-motion';
+import { StatCard } from '@/components/common/stat-card';
 
 interface Repository {
   id: number;
@@ -26,7 +27,39 @@ interface Repository {
   stargazers_count: number;
 }
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+interface StatCardData {
+  key: string;
+  title: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  stats?: {
+    openIssues: number;
+    trackedRepos: number;
+    analyzedRepos: number;
+    activeAutomations: number;
+    refreshing?: {
+      openIssues?: boolean;
+      trackedRepos?: boolean;
+      analyzedRepos?: boolean;
+      activeAutomations?: boolean;
+    };
+  };
+  onRefreshStats?: {
+    openIssues: () => void;
+    trackedRepos: () => void;
+    analyzedRepos: () => void;
+    activeAutomations: () => void;
+  };
+}
+
+export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLayoutProps) {
   const { user } = useUser();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -42,6 +75,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [selectedAnalysisRepo, setSelectedAnalysisRepo] = useState<{ owner: string; name: string } | null>(null);
   const [isAnalysisView, setIsAnalysisView] = useState(false);
+  const statsCardsRef = useRef<HTMLDivElement>(null);
+  const rightSidebarRef = useRef<HTMLDivElement>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const handleSearch = useCallback(async () => {
     if (!user) {
@@ -138,7 +174,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     navigate(`/analyze/${repo.owner.login}/${repo.name}`);
   };
 
-  const handleRepoClick = (owner: string, name: string) => {
+  const handleRepoClick = async (owner: string, name: string) => {
     setSelectedAnalysisRepo({ owner, name });
     setIsAnalysisView(true);
   };
@@ -336,52 +372,109 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* Main content with animation */}
         <AnimatePresence mode="wait">
-          {isAnalysisView && selectedAnalysisRepo ? (
-            <motion.div 
-              className="flex-1 flex"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {/* Main content area */}
+          <motion.div
+            className="flex-1 flex relative"
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+          >
+            {/* Analysis View Content */}
+            {isAnalysisView && selectedAnalysisRepo && (
               <div className="flex-1 overflow-y-auto p-6">
-                <div className="mb-6 flex items-center justify-between">
-                  <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-                    {selectedAnalysisRepo.owner}/{selectedAnalysisRepo.name}
-                  </h1>
-                  <button
-                    onClick={() => setIsAnalysisView(false)}
-                    className="text-sm hover:opacity-80"
-                    style={{ color: theme.colors.text.secondary }}
-                  >
-                    ← Back to Dashboard
-                  </button>
-                </div>
-                <IssueProcessor
-                  repositoryId={`${selectedAnalysisRepo.owner}/${selectedAnalysisRepo.name}`}
-                  owner={selectedAnalysisRepo.owner}
-                  name={selectedAnalysisRepo.name}
-                />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 1 }}
+                >
+                  <div className="mb-6 flex items-center justify-between">
+                    <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                      {selectedAnalysisRepo.owner}/{selectedAnalysisRepo.name}
+                    </h1>
+                    <button
+                      onClick={() => setIsAnalysisView(false)}
+                      className="text-sm hover:opacity-80"
+                      style={{ color: theme.colors.text.secondary }}
+                    >
+                      ← Back to Dashboard
+                    </button>
+                  </div>
+                  <IssueProcessor
+                    repositoryId={`${selectedAnalysisRepo.owner}/${selectedAnalysisRepo.name}`}
+                    owner={selectedAnalysisRepo.owner}
+                    name={selectedAnalysisRepo.name}
+                  />
+                </motion.div>
               </div>
+            )}
 
-              {/* Right sidebar */}
+            {/* Right sidebar border */}
+            {isAnalysisView && (
               <motion.div
-                className="w-80 border-l overflow-y-auto p-4"
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: 320, opacity: 1 }}
-                exit={{ width: 0, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{ borderColor: theme.colors.border.primary }}
-              >
-                <div className="space-y-6">
-                  <div>
+                className="w-80 border-l"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 1.4 }}
+                style={{
+                  borderColor: theme.colors.border.primary
+                }}
+              />
+            )}
+
+            {/* Stat Cards - These will animate between grid and sidebar */}
+            <div className={`${isAnalysisView ? 'absolute right-0 w-80' : 'p-6 w-full'}`}>
+              <div className={isAnalysisView ? 'px-4 pt-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
+                <StatCard
+                  layoutId="stat-card-openIssues"
+                  id="openIssues"
+                  title="Open Issues"
+                  value={stats?.openIssues?.toString() || '0'}
+                  description="Across all tracked repositories"
+                  icon={GitPullRequest}
+                  onRefresh={onRefreshStats?.openIssues}
+                  refreshing={stats?.refreshing?.openIssues}
+                  variant={isAnalysisView ? 'compact' : 'default'}
+                />
+                <StatCard
+                  layoutId="stat-card-trackedRepos"
+                  id="trackedRepos"
+                  title="Tracked Repos"
+                  value={stats?.trackedRepos?.toString() || '0'}
+                  description="Being monitored"
+                  icon={Star}
+                  onRefresh={onRefreshStats?.trackedRepos}
+                  refreshing={stats?.refreshing?.trackedRepos}
+                  variant={isAnalysisView ? 'compact' : 'default'}
+                />
+                <StatCard
+                  layoutId="stat-card-analyzedRepos"
+                  id="analyzedRepos"
+                  title="Analyzed Repos"
+                  value={stats?.analyzedRepos?.toString() || '0'}
+                  description="In the last 30 days"
+                  icon={Search}
+                  onRefresh={onRefreshStats?.analyzedRepos}
+                  refreshing={stats?.refreshing?.analyzedRepos}
+                  variant={isAnalysisView ? 'compact' : 'default'}
+                />
+                <StatCard
+                  layoutId="stat-card-activeAutomations"
+                  id="activeAutomations"
+                  title="Active Automations"
+                  value={stats?.activeAutomations?.toString() || '0'}
+                  description="Currently running"
+                  icon={Settings}
+                  onRefresh={onRefreshStats?.activeAutomations}
+                  refreshing={stats?.refreshing?.activeAutomations}
+                  variant={isAnalysisView ? 'compact' : 'default'}
+                />
+
+                {isAnalysisView && (
+                  <div className="mt-6">
                     <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
                       Analysis Actions
                     </h3>
                     <button
                       className="w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                      style={{ 
+                      style={{
                         backgroundColor: theme.colors.brand.primary,
                         color: theme.colors.text.primary
                       }}
@@ -389,44 +482,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       Start Analysis
                     </button>
                   </div>
-
-                  <div>
-                    <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                      Repository Stats
-                    </h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                          Last Analysis
-                        </span>
-                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>
-                          Never
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                          Issues Found
-                        </span>
-                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>
-                          0
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          ) : (
-            <motion.div 
-              className="flex-1 overflow-y-auto p-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              {children}
-            </motion.div>
-          )}
+                )}
+              </div>
+            </div>
+          </motion.div>
         </AnimatePresence>
       </div>
 

@@ -7,6 +7,8 @@ import { RepositoryDetailView } from '@/components/repository/repository-detail-
 import { supabase } from '@/lib/auth/supabase-client';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { toast } from '@/hooks/use-toast';
+import { StatCard } from '@/components/common/stat-card';
+import { DashboardLayout } from '@/components/layout/dashboard-container';
 
 interface DashboardStats {
   openIssues: number;
@@ -412,121 +414,37 @@ export function Dashboard() {
   };
 
   return (
-    <div className="flex">
-      {/* Main Content */}
-      <motion.div
-        layout
-        className={`flex-1 transition-all ${selectedRepo ? 'mr-80' : ''}`}
-      >
+    <DashboardLayout
+      stats={{
+        ...stats,
+        refreshing
+      }}
+      onRefreshStats={refreshStats}
+    >
+      <div className="flex-1">
         {/* Stats Grid */}
-        <motion.div
-          layout
-          className={`grid transition-all ${
-            selectedRepo
-              ? 'grid-cols-1 gap-2'
-              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'
-          }`}
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
         >
           {statCards.map((stat) => (
-            <motion.div
-              layout
+            <StatCard
               key={stat.key}
-              className="p-4 rounded-lg"
-              style={{ backgroundColor: theme.colors.background.secondary }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                      {stat.title}
-                    </p>
-                    <button
-                      onClick={stat.onRefresh}
-                      disabled={stat.refreshing}
-                      className="p-1 rounded-full hover:bg-gray-500/10 transition-colors"
-                      aria-label={`Refresh ${stat.title.toLowerCase()}`}
-                    >
-                      <RefreshCw
-                        className={`h-3 w-3 ${stat.refreshing ? 'animate-spin' : ''}`}
-                        style={{ color: theme.colors.text.secondary }}
-                      />
-                    </button>
-                  </div>
-                  <p className="text-2xl font-semibold mt-1" style={{ color: theme.colors.text.primary }}>
-                    {stat.value}
-                  </p>
-                  <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
-                    {stat.description}
-                  </p>
-                </div>
-                <stat.icon className="h-8 w-8" style={{ color: theme.colors.text.secondary }} />
-              </div>
-            </motion.div>
+              id={stat.key}
+              title={stat.title}
+              value={stat.value}
+              description={stat.description}
+              icon={stat.icon}
+              onRefresh={stat.onRefresh}
+              refreshing={stat.refreshing}
+            />
           ))}
-        </motion.div>
+        </div>
 
-        {/* Repository List or Detail View */}
-        <motion.div layout className="mt-6">
-          {selectedRepo ? (
-            <RepositoryDetailView repository={selectedRepo} />
-          ) : (
-            <RepositoryList onRepositorySelect={handleRepositorySelect} />
-          )}
-        </motion.div>
-      </motion.div>
-
-      {/* Right Sidebar */}
-      <AnimatePresence>
-        {selectedRepo && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 320, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            className="fixed top-0 right-0 h-full p-4 border-l"
-            style={{
-              backgroundColor: theme.colors.background.primary,
-              borderColor: theme.colors.border.primary
-            }}
-          >
-            {/* Stats Cards */}
-            <div className="space-y-2">
-              {statCards.map((stat) => (
-                <motion.div
-                  key={stat.key}
-                  layout
-                  className="p-4 rounded-lg"
-                  style={{ backgroundColor: theme.colors.background.secondary }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                          {stat.title}
-                        </p>
-                        <button
-                          onClick={stat.onRefresh}
-                          disabled={stat.refreshing}
-                          className="p-1 rounded-full hover:bg-gray-500/10 transition-colors"
-                          aria-label={`Refresh ${stat.title.toLowerCase()}`}
-                        >
-                          <RefreshCw
-                            className={`h-3 w-3 ${stat.refreshing ? 'animate-spin' : ''}`}
-                            style={{ color: theme.colors.text.secondary }}
-                          />
-                        </button>
-                      </div>
-                      <p className="text-2xl font-semibold mt-1" style={{ color: theme.colors.text.primary }}>
-                        {stat.value}
-                      </p>
-                    </div>
-                    <stat.icon className="h-8 w-8" style={{ color: theme.colors.text.secondary }} />
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+        {/* Repository List */}
+        <div className="mt-6">
+          <RepositoryList onRepositorySelect={handleRepositorySelect} />
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

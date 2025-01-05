@@ -23,9 +23,7 @@ const router = createBrowserRouter([
     path: '/dashboard',
     element: (
       <ProtectedRoute>
-        <DashboardLayout>
-          <Dashboard />
-        </DashboardLayout>
+        <Dashboard />
       </ProtectedRoute>
     ),
     errorElement: <ErrorBoundary />
