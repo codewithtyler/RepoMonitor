@@ -16,10 +16,10 @@ async function combineMigrations() {
 
     // Combine each migration file
     for (const file of migrationFiles) {
-      console.log(`Processing migration: ${file}`);
+
       const filePath = path.join(__dirname, file);
       const migrationSQL = fs.readFileSync(filePath, 'utf8');
-      
+
       combinedSQL += `-- Migration: ${file}\n`;
       combinedSQL += migrationSQL;
       combinedSQL += '\n\n';
@@ -35,4 +35,4 @@ async function combineMigrations() {
   }
 }
 
-combineMigrations(); 
+combineMigrations();

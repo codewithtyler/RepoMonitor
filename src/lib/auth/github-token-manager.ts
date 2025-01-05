@@ -37,11 +37,8 @@ export class GitHubTokenManager {
         // Try localStorage first
         const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
         if (storedToken?.startsWith('gho_')) {
-            console.log('[GitHubTokenManager] Using token from localStorage');
             return storedToken;
         }
-
-        console.log('[GitHubTokenManager] No valid token in localStorage, fetching from database');
 
         // If not in localStorage, get from database
         const { data: tokenData, error } = await supabase
@@ -73,7 +70,6 @@ export class GitHubTokenManager {
 
         // Store in localStorage for future use
         localStorage.setItem(TOKEN_STORAGE_KEY, cleanToken);
-        console.log('[GitHubTokenManager] Token stored in localStorage');
 
         return cleanToken;
     }

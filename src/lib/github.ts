@@ -28,6 +28,8 @@ interface GitHubSearchResult {
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<any>;
   listRepositoryIssues(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; labels?: string; per_page?: number; page?: number }): Promise<any>;
+  listRepositoryPullRequests(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number }): Promise<any>;
+  searchRepositoryIssues(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number }): Promise<any>;
   checkRepositoryAccess(owner: string, repo: string): Promise<{ hasAccess: boolean; isPrivate: boolean | null; permissions: any | null }>;
   getCurrentUser(): Promise<any>;
   listUserRepositories(options?: { type?: 'all' | 'owner' | 'public' | 'private' | 'member'; sort?: 'created' | 'updated' | 'pushed' | 'full_name'; per_page?: number; page?: number; searchQuery?: string }): Promise<any>;
@@ -53,10 +55,6 @@ class GitHubClientImpl implements GitHubClient {
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE}${path}`;
 
-    // Debug token format
-    console.log('[GitHub Debug] Token starts with:', this.token.substring(0, 4));
-    console.log('[GitHub Debug] Token format valid:', /^gho_[A-Za-z0-9]{36}$/.test(this.token));
-
     const headers = {
       'Accept': 'application/vnd.github+json',
       'Authorization': `token ${this.token}`,
@@ -64,16 +62,6 @@ class GitHubClientImpl implements GitHubClient {
       'User-Agent': 'RepoMonitor',
       ...options.headers
     };
-
-    // Debug authorization header and token format
-    console.log('[GitHub Debug] Token validation:', {
-      length: this.token.length,
-      startsWithGho: this.token.startsWith('gho_'),
-      format: /^gho_[A-Za-z0-9]{36}$/.test(this.token)
-    });
-    console.log('[GitHub Debug] Authorization header:', headers.Authorization.replace(/Bearer .*/, 'Bearer [REDACTED]'));
-    console.log('[GitHub Debug] Full URL:', url);
-    console.log('[GitHub Debug] Method:', options.method || 'GET');
 
     // Bind fetch to window explicitly
     const boundFetch = window.fetch.bind(window);
@@ -133,18 +121,10 @@ class GitHubClientImpl implements GitHubClient {
     while (retryCount < maxRetries) {
       try {
         await this.waitForRateLimit();
-        console.log(`[GitHub] Attempt ${retryCount + 1}/${maxRetries}: Making API request`);
         const result = await operation();
-        console.log('[GitHub Debug] Request succeeded:', result);
         return result;
       } catch (error) {
         const githubError = error as GitHubError;
-        console.log(`[GitHub] Attempt ${retryCount + 1} failed:`, {
-          error: error,
-          name: error instanceof Error ? error.name : typeof error,
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack?.split('\n') : undefined
-        });
 
         if (retryCount >= maxRetries - 1) {
           throw error;
@@ -156,7 +136,6 @@ class GitHubClientImpl implements GitHubClient {
         } catch (handledError) {
           if ((handledError as Error).message === 'RETRY') {
             const delay = Math.pow(2, retryCount) * 1000;
-            console.log(`[GitHub] Will retry in ${delay}ms`);
             await new Promise(resolve => setTimeout(resolve, delay));
             retryCount++;
             continue;
@@ -178,7 +157,6 @@ class GitHubClientImpl implements GitHubClient {
     } catch (error) {
       if ((error as GitHubError).status === 404) {
         // If not found, search for repositories with this name
-        console.log(`[GitHub] Repository ${owner}/${repo} not found, searching all repositories`);
         const searchParams = new URLSearchParams({
           q: `${repo} in:name`,
           sort: 'stars',
@@ -212,9 +190,37 @@ class GitHubClientImpl implements GitHubClient {
     });
     if (options.labels) params.set('labels', options.labels);
 
-    return this.withRetry(() =>
+    const response = await this.withRetry(() =>
       this.request(`/repos/${owner}/${repo}/issues?${params}`)
     );
+    return response;
+  }
+
+  async listRepositoryPullRequests(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number } = {}) {
+    const params = new URLSearchParams({
+      state: options.state || 'open',
+      per_page: (options.per_page || 100).toString(),
+      page: (options.page || 1).toString()
+    });
+
+    const response = await this.withRetry(() =>
+      this.request(`/repos/${owner}/${repo}/pulls?${params}`)
+    );
+    return response;
+  }
+
+  async searchRepositoryIssues(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number } = {}) {
+    const query = `repo:${owner}/${repo} is:issue is:${options.state || 'open'}`;
+    const params = new URLSearchParams({
+      q: query,
+      per_page: (options.per_page || 100).toString(),
+      page: (options.page || 1).toString()
+    });
+
+    const response = await this.withRetry(() =>
+      this.request(`/search/issues?${params}`)
+    );
+    return response;
   }
 
   async checkRepositoryAccess(owner: string, repo: string) {
@@ -254,8 +260,6 @@ class GitHubClientImpl implements GitHubClient {
     page?: number;
     searchQuery?: string;
   } = {}) {
-    console.log('[GitHub] Listing repositories:', options);
-
     // If we have a search query, search for repositories
     if (options.searchQuery) {
       // First get the authenticated user's login
@@ -266,19 +270,15 @@ class GitHubClientImpl implements GitHubClient {
       // Build search query using GitHub's search qualifiers
       const searchQuery = options.searchQuery.toLowerCase();
 
-      console.log('[GitHub] User login:', user.login);
-
       // First get all user's repositories that match the query
       const userRepos = await this.withRetry(() =>
         this.request<any[]>('/user/repos')
       ).catch(() => []);
 
       // Filter user's repos to match the search query
-      const matchingUserRepos = userRepos.filter(repo => 
+      const matchingUserRepos = userRepos.filter(repo =>
         repo.name.toLowerCase().includes(searchQuery)
       );
-
-      console.log('[GitHub] Matching user repos:', matchingUserRepos.map(r => r.full_name));
 
       // Then get all other repositories
       const query = encodeURIComponent(`${searchQuery} in:name`);
@@ -333,14 +333,6 @@ class GitHubClientImpl implements GitHubClient {
         // Finally, sort by stars
         return (b.stargazers_count || 0) - (a.stargazers_count || 0);
       });
-
-      // Log the sorted results for debugging
-      console.log('[GitHub] Sorted results:', sortedItems.map(item => ({
-        name: item.name,
-        owner: item.owner.login,
-        stars: item.stargazers_count,
-        priority: item.owner.login.toLowerCase() === user.login.toLowerCase() ? 1 : 2
-      })));
 
       // Return top results after sorting
       return sortedItems.slice(0, options.per_page || 10);

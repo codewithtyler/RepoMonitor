@@ -29,15 +29,12 @@ export function RepositoryList() {
 
   const loadRepositories = async () => {
     try {
-      console.log('Loading repositories...');
       const repos = await withGitHub(async (client: GitHubClient) => {
-        console.log('GitHub client created, fetching repositories...');
         const response = await client.listUserRepositories({
           sort: 'updated',
           per_page: 100,
           searchQuery: searchQuery
         });
-        console.log('Repositories response:', response);
         return response.map((repo: {
           id: number;
           name: string;
@@ -57,7 +54,6 @@ export function RepositoryList() {
         }));
       });
 
-      console.log('Processed repositories:', repos);
       if (repos) {
         setRepositories(repos);
       }

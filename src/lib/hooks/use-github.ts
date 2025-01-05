@@ -11,14 +11,7 @@ export function useGitHub() {
   const navigate = useNavigate();
 
   const handleGitHubError = useCallback((error: Error) => {
-    console.log('[handleGitHubError] Handling error:', {
-      message: error.message,
-      type: error.constructor.name,
-      stack: error.stack
-    });
-
     if (error.message === 'TOKEN_EXPIRED') {
-      console.log('[handleGitHubError] Token expired, redirecting to auth');
       toast({
         title: 'Session Expired',
         description: 'Please sign in again to continue.',
@@ -29,7 +22,6 @@ export function useGitHub() {
     }
 
     if (error.message === 'Failed to get GitHub token') {
-      console.log('[handleGitHubError] No token found, redirecting to auth');
       toast({
         title: 'Authentication Error',
         description: 'Please sign in again to continue.',
@@ -41,7 +33,6 @@ export function useGitHub() {
 
     // Handle rate limit errors
     if (error.message.includes('rate limit')) {
-      console.log('[handleGitHubError] Rate limit exceeded');
       toast({
         title: 'Rate Limit Exceeded',
         description: 'Please wait a few minutes and try again.',
@@ -52,7 +43,6 @@ export function useGitHub() {
 
     // Handle permission errors
     if (error.message.includes('permission') || error.message.includes('403')) {
-      console.log('[handleGitHubError] Permission denied');
       toast({
         title: 'Permission Denied',
         description: 'You don\'t have permission to perform this action.',
@@ -62,7 +52,6 @@ export function useGitHub() {
     }
 
     // Generic error
-    console.log('[handleGitHubError] Unhandled error');
     toast({
       title: 'Error',
       description: error.message,
@@ -71,9 +60,7 @@ export function useGitHub() {
   }, [navigate]);
 
   const withGitHub = useCallback(async <T>(operation: (client: GitHubClient) => Promise<T>): Promise<T | null> => {
-    console.log('[withGitHub] Starting operation with user:', user?.id);
     if (!user) {
-      console.log('[withGitHub] No user found, redirecting to auth');
       toast({
         title: 'Authentication Required',
         description: 'Please sign in to continue.',
@@ -85,12 +72,9 @@ export function useGitHub() {
 
     setLoading(true);
     try {
-      console.log('[withGitHub] Getting GitHub client for user:', user.id);
       const client = await getGitHubClient(user.id);
-      console.log('[withGitHub] Got client, executing operation');
       return await operation(client);
     } catch (error) {
-      console.log('[withGitHub] Operation failed:', error);
       handleGitHubError(error as Error);
       return null;
     } finally {

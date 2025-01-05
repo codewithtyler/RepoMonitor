@@ -111,9 +111,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       if (error) throw error;
 
+      toast({
+        title: 'Repository Added',
+        description: `Now tracking ${repo.owner.login}/${repo.name}`,
+      });
+
       setSelectedRepo(null);
-      navigate('/tracked');
-      triggerSearch();
+      setSearchQuery('');
+      setSearchResults([]);
     } catch (error) {
       console.error('Error tracking repository:', error);
       toast({
