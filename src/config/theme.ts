@@ -1,19 +1,20 @@
 export const theme = {
   colors: {
     brand: {
-      primary: '#0ea5e9', // sky-500
+      primary: '#238636',
       secondary: '#0284c7', // sky-600
     },
     text: {
-      primary: '#f8fafc', // slate-50
-      secondary: '#94a3b8', // slate-400
+      primary: '#c9d1d9',
+      secondary: '#8b949e',
+      error: '#f85149'
     },
     background: {
-      primary: '#0f172a', // slate-900
-      secondary: '#1e293b', // slate-800
+      primary: '#0d1117',
+      secondary: '#161b22'
     },
     border: {
-      primary: '#334155', // slate-700
+      primary: '#30363d',
       secondary: '#475569', // slate-600
     },
     error: {
@@ -34,8 +35,8 @@ export const theme = {
         background: 'rgba(249, 115, 22, 0.1)', // orange-500/10
       },
       batch: {
-        icon: '#eab308', // yellow-500
-        background: 'rgba(234, 179, 8, 0.1)', // yellow-500/10
+        icon: '#f59e0b', // yellow-500
+        background: 'rgba(245, 158, 11, 0.1)', // yellow-500/10
       },
       search: {
         icon: '#ef4444', // red-500

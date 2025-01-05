@@ -1,9 +1,9 @@
-import { Github, Sparkles, Zap, Search, Box } from 'lucide-react';
+import { Activity, Sparkles, Zap, Search, Box } from 'lucide-react';
 import { Footer } from '../components/layout/footer';
 import { theme } from '../config/theme';
 import { supabase } from '../lib/auth/supabase-client';
 
-export function HomePage() {
+export function Home() {
   const handleGitHubSignIn = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -26,7 +26,7 @@ export function HomePage() {
     <div className="flex min-h-screen flex-col items-center justify-center" style={{ backgroundColor: theme.colors.background.primary, color: theme.colors.text.primary }}>
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center px-4 py-16 text-center">
-        <Github className="mb-6 h-16 w-16" style={{ color: theme.colors.brand.primary }} />
+        <Activity className="mb-6 h-16 w-16" style={{ color: theme.colors.brand.primary }} />
         <h1 className="mb-4 text-5xl font-bold">RepoMonitor</h1>
         <p className="mb-8 text-xl" style={{ color: theme.colors.text.secondary }}>
           Monitor and manage your GitHub repositories with AI-powered insights
@@ -35,10 +35,10 @@ export function HomePage() {
         </p>
         <button
           onClick={handleGitHubSignIn}
-          className="flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors hover:bg-[#2ea043]"
+          className="flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors hover:opacity-80"
           style={{ backgroundColor: theme.colors.brand.primary, color: theme.colors.text.primary }}
         >
-          <Github className="h-5 w-5" />
+          <Activity className="h-5 w-5" />
           Sign in with GitHub
         </button>
       </div>

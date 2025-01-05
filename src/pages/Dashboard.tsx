@@ -10,13 +10,13 @@ const stats = [
     icon: GitPullRequest
   },
   {
-    title: "Watched Repos",
+    title: "Tracked Repos",
     value: "0",
     description: "Being monitored",
     icon: Star
   },
   {
-    title: "Recent Searches",
+    title: "Analyzed Repos",
     value: "0",
     description: "In the last 30 days",
     icon: Search
@@ -29,9 +29,9 @@ const stats = [
   }
 ];
 
-export function DashboardPage() {
+export function Dashboard() {
   return (
-    <div className="p-6 space-y-6">
+    <>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
@@ -59,9 +59,9 @@ export function DashboardPage() {
       </div>
 
       {/* Repository List */}
-      <div className="rounded-lg p-6" style={{ backgroundColor: theme.colors.background.secondary }}>
+      <div className="mt-6">
         <RepositoryList />
       </div>
-    </div>
+    </>
   );
 }

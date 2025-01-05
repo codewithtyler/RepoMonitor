@@ -25,7 +25,7 @@ export function AuthPage() {
         provider: 'github',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
-          scopes: 'repo read:user'
+          scopes: 'repo user user:email'
         }
       });
 

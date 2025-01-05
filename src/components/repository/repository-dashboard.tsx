@@ -31,11 +31,13 @@ export function RepositoryDashboard() {
       setLoading(true);
       const result = await withGitHub(async (client) => {
         const response = await client.listUserRepositories();
-        return response.data.map(repo => ({
+        return response.data.map((repo: any) => ({
           id: repo.id,
-          full_name: repo.full_name,
-          last_analysis_timestamp: null,
-          analyzed_by_user: null
+          name: repo.name,
+          owner: repo.owner,
+          description: repo.description,
+          private: repo.private,
+          stargazers_count: repo.stargazers_count
         }));
       });
 
@@ -43,7 +45,7 @@ export function RepositoryDashboard() {
         // Load analysis metadata for each repository
         const sharingService = new AnalysisSharingService(user!.id);
         const reposWithAnalysis = await Promise.all(
-          result.map(async (repo) => {
+          result.map(async (repo: Repository) => {
             const access = await sharingService.checkRepositoryAccess(
               repo.full_name.split('/')[0],
               repo.full_name.split('/')[1]

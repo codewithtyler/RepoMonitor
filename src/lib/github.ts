@@ -65,7 +65,12 @@ class GitHubClientImpl implements GitHubClient {
       ...options.headers
     };
 
-    // Debug authorization header
+    // Debug authorization header and token format
+    console.log('[GitHub Debug] Token validation:', {
+      length: this.token.length,
+      startsWithGho: this.token.startsWith('gho_'),
+      format: /^gho_[A-Za-z0-9]{36}$/.test(this.token)
+    });
     console.log('[GitHub Debug] Authorization header:', headers.Authorization.replace(/Bearer .*/, 'Bearer [REDACTED]'));
     console.log('[GitHub Debug] Full URL:', url);
     console.log('[GitHub Debug] Method:', options.method || 'GET');
@@ -251,37 +256,107 @@ class GitHubClientImpl implements GitHubClient {
   } = {}) {
     console.log('[GitHub] Listing repositories:', options);
 
-    // Get user's repositories
-    const userRepos = await this.withRetry(() =>
-      this.request<any[]>('/user/repos')
-    ).catch(() => []);
-
-    // If we have a search query, also search for public repositories
+    // If we have a search query, search for repositories
     if (options.searchQuery) {
-      const searchParams = new URLSearchParams({
-        q: `${options.searchQuery} in:name`,
-        sort: 'stars',
-        order: 'desc',
-        per_page: '10'
-      });
+      // First get the authenticated user's login
+      const user = await this.withRetry(() =>
+        this.request<{ login: string }>('/user')
+      );
 
+      // Build search query using GitHub's search qualifiers
+      const searchQuery = options.searchQuery.toLowerCase();
+
+      console.log('[GitHub] User login:', user.login);
+
+      // First get all user's repositories that match the query
+      const userRepos = await this.withRetry(() =>
+        this.request<any[]>('/user/repos')
+      ).catch(() => []);
+
+      // Filter user's repos to match the search query
+      const matchingUserRepos = userRepos.filter(repo => 
+        repo.name.toLowerCase().includes(searchQuery)
+      );
+
+      console.log('[GitHub] Matching user repos:', matchingUserRepos.map(r => r.full_name));
+
+      // Then get all other repositories
+      const query = encodeURIComponent(`${searchQuery} in:name`);
       const searchResult = await this.withRetry(() =>
-        this.request<GitHubSearchResult>(`/search/repositories?${searchParams}`)
+        this.request<GitHubSearchResult>(`/search/repositories?q=${query}&sort=stars&order=desc&per_page=100`)
       ).catch(() => ({ items: [] }));
 
-      // Combine and deduplicate results
-      const allRepos = [...userRepos];
-      for (const searchRepo of searchResult.items) {
-        if (!allRepos.some(repo => repo.id === searchRepo.id)) {
-          allRepos.push(searchRepo);
+      // Combine results, excluding duplicates
+      const allItems = [...matchingUserRepos];
+      for (const item of searchResult.items) {
+        if (!allItems.some(existing => existing.id === item.id)) {
+          allItems.push(item);
         }
       }
 
-      return allRepos;
+      // Sort results
+      const sortedItems = allItems.sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        const aOwner = a.owner.login.toLowerCase();
+        const bOwner = b.owner.login.toLowerCase();
+        const userLogin = user.login.toLowerCase();
+
+        // First, prioritize exact name matches
+        const aExactMatch = aName === searchQuery;
+        const bExactMatch = bName === searchQuery;
+
+        if (aExactMatch || bExactMatch) {
+          // If at least one is an exact match, use priority + stars system
+          const aPriority = aOwner === userLogin ? 1 : 2;
+          const bPriority = bOwner === userLogin ? 1 : 2;
+
+          // If priorities are different, sort by priority
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority;
+          }
+
+          // If same priority, sort by stars
+          return (b.stargazers_count || 0) - (a.stargazers_count || 0);
+        }
+
+        // For non-exact matches, prioritize by name similarity
+        const aStartsWith = aName.startsWith(searchQuery);
+        const bStartsWith = bName.startsWith(searchQuery);
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+
+        // Then by user's repositories
+        if (aOwner === userLogin && bOwner !== userLogin) return -1;
+        if (aOwner !== userLogin && bOwner === userLogin) return 1;
+
+        // Finally, sort by stars
+        return (b.stargazers_count || 0) - (a.stargazers_count || 0);
+      });
+
+      // Log the sorted results for debugging
+      console.log('[GitHub] Sorted results:', sortedItems.map(item => ({
+        name: item.name,
+        owner: item.owner.login,
+        stars: item.stargazers_count,
+        priority: item.owner.login.toLowerCase() === user.login.toLowerCase() ? 1 : 2
+      })));
+
+      // Return top results after sorting
+      return sortedItems.slice(0, options.per_page || 10);
     }
 
-    // If no search query, just return user repos
-    return userRepos;
+    // If no search query, get user's repositories
+    const params = new URLSearchParams({
+      type: options.type || 'all',
+      sort: options.sort || 'updated',
+      per_page: (options.per_page || 100).toString(),
+      page: (options.page || 1).toString()
+    });
+
+    return this.withRetry(() =>
+      this.request<any[]>(`/user/repos?${params}`)
+    );
   }
 }
 
