@@ -1,24 +1,53 @@
-import * as React from "react";
+import { ButtonHTMLAttributes, forwardRef } from 'react';
+import { theme } from '@/config/theme';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'outline';
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary';
 }
 
-export function Button({
-  className = '',
-  variant = 'default',
-  ...props
-}: ButtonProps) {
-  const baseStyles = "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50";
-  const variantStyles = {
-    default: "bg-blue-500 text-white hover:bg-blue-600",
-    outline: "border border-gray-300 bg-white hover:bg-gray-50"
-  };
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className = '', variant = 'primary', disabled, children, ...props }, ref) => {
+    const baseStyles = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
+    const variantStyles = {
+      primary: {
+        default: theme.colors.brand.primary,
+        hover: theme.colors.brand.primary + 'dd',
+        disabled: theme.colors.brand.primary + '99'
+      },
+      secondary: {
+        default: theme.colors.background.secondary,
+        hover: theme.colors.background.secondary + 'dd',
+        disabled: theme.colors.background.secondary + '99'
+      }
+    };
 
-  return (
-    <button
-      className={`${baseStyles} ${variantStyles[variant]} ${className}`}
-      {...props}
-    />
-  );
-} 
+    const styles = variantStyles[variant];
+
+    return (
+      <button
+        ref={ref}
+        className={`${baseStyles} ${className}`}
+        disabled={disabled}
+        style={{
+          backgroundColor: disabled ? styles.disabled : styles.default,
+          color: theme.colors.text.primary,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.7 : 1
+        }}
+        {...props}
+        onMouseEnter={(e) => {
+          if (!disabled) {
+            (e.target as HTMLButtonElement).style.backgroundColor = styles.hover;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!disabled) {
+            (e.target as HTMLButtonElement).style.backgroundColor = styles.default;
+          }
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+); 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGitHub } from '@/lib/hooks/use-github';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Star, GitBranch } from 'lucide-react';
 import { theme } from '@/config/theme';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/auth/supabase-client';
@@ -18,9 +18,15 @@ interface Repository {
   private: boolean;
   description: string | null;
   updated_at: string | null;
+  stargazers_count: number;
+  forks_count: number;
 }
 
-export function RepositoryList() {
+interface RepositoryListProps {
+  onRepositorySelect?: (owner: string, name: string) => void;
+}
+
+export function RepositoryList({ onRepositorySelect }: RepositoryListProps) {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepos, setSelectedRepos] = useState<Set<number>>(new Set());
   const { loading, withGitHub } = useGitHub();
@@ -42,6 +48,8 @@ export function RepositoryList() {
           private: boolean;
           description: string | null;
           updated_at: string | null;
+          stargazers_count: number;
+          forks_count: number;
         }): Repository => ({
           id: repo.id,
           name: repo.name,
@@ -50,7 +58,9 @@ export function RepositoryList() {
           },
           private: repo.private,
           description: repo.description,
-          updated_at: repo.updated_at
+          updated_at: repo.updated_at,
+          stargazers_count: repo.stargazers_count,
+          forks_count: repo.forks_count
         }));
       });
 
@@ -157,6 +167,11 @@ export function RepositoryList() {
     searchQuery ? `${repo.owner.login}/${repo.name}`.toLowerCase().includes(searchQuery.toLowerCase()) : true
   );
 
+  const handleClick = (owner: string, name: string) => {
+    onRepositorySelect?.(owner, name);
+    navigate(`/analyze/${owner}/${name}`);
+  };
+
   return (
     <>
       {loading ? (
@@ -165,45 +180,45 @@ export function RepositoryList() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredRepos.map(repo => (
+          {filteredRepos.map((repo) => (
             <div
-              key={repo.id}
-              className="flex items-center justify-between rounded-lg p-4"
-              style={{
-                backgroundColor: theme.colors.background.secondary,
-                borderColor: theme.colors.border.primary
-              }}
+              key={`${repo.owner.login}/${repo.name}`}
+              className="p-4 rounded-lg cursor-pointer hover:bg-gray-800/30 transition-colors"
+              style={{ backgroundColor: theme.colors.background.secondary }}
+              onClick={() => handleClick(repo.owner.login, repo.name)}
             >
-              <div>
-                <h3 className="font-medium" style={{ color: theme.colors.text.primary }}>
-                  {repo.owner.login}/{repo.name}
-                </h3>
-                {repo.description && (
-                  <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                    {repo.description}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                {selectedRepos.has(repo.id) ? (
-                  <button
-                    onClick={() => removeRepository(repo)}
-                    className="flex items-center rounded-lg px-3 py-1"
-                    style={{ backgroundColor: '#dc2626', color: theme.colors.text.primary }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Remove
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => trackRepository(repo)}
-                    className="flex items-center rounded-lg px-3 py-1"
-                    style={{ backgroundColor: theme.colors.brand.primary, color: theme.colors.text.primary }}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Track
-                  </button>
-                )}
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
+                      {repo.owner.login}/{repo.name}
+                    </h3>
+                    {repo.private && (
+                      <span className="px-2 py-1 text-xs rounded-full" style={{ backgroundColor: theme.colors.background.primary }}>
+                        Private
+                      </span>
+                    )}
+                  </div>
+                  {repo.description && (
+                    <p className="mt-1 text-sm" style={{ color: theme.colors.text.secondary }}>
+                      {repo.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1">
+                    <Star className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+                    <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      {repo.stargazers_count}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <GitBranch className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+                    <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      {repo.forks_count}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           ))}

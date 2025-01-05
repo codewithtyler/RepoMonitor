@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { GitPullRequest, Search, Settings, Star, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { theme } from '../config/theme';
 import { RepositoryList } from '@/components/repository/repository-list';
+import { RepositoryDetailView } from '@/components/repository/repository-detail-view';
 import { supabase } from '@/lib/auth/supabase-client';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { toast } from '@/hooks/use-toast';
@@ -13,6 +15,17 @@ interface DashboardStats {
   activeAutomations: number;
 }
 
+interface SelectedRepository {
+  owner: string;
+  name: string;
+  description?: string;
+  stargazers_count?: number;
+  forks_count?: number;
+  open_issues_count?: number;
+  subscribers_count?: number;
+  last_analysis_timestamp?: string;
+}
+
 export function Dashboard() {
   const [stats, setStats] = useState<DashboardStats>({
     openIssues: 0,
@@ -21,6 +34,7 @@ export function Dashboard() {
     activeAutomations: 0
   });
   const [refreshing, setRefreshing] = useState<{ [key: string]: boolean }>({});
+  const [selectedRepo, setSelectedRepo] = useState<SelectedRepository | null>(null);
   const { withGitHub } = useGitHub();
 
   // Initial data fetch
@@ -381,51 +395,138 @@ export function Dashboard() {
     }
   ];
 
-  return (
-    <>
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat) => (
-          <div
-            key={stat.key}
-            className="p-4 rounded-lg"
-            style={{ backgroundColor: theme.colors.background.secondary }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                    {stat.title}
-                  </p>
-                  <button
-                    onClick={stat.onRefresh}
-                    disabled={stat.refreshing}
-                    className="p-1 rounded-full hover:bg-gray-500/10 transition-colors"
-                    aria-label={`Refresh ${stat.title.toLowerCase()}`}
-                  >
-                    <RefreshCw
-                      className={`h-3 w-3 ${stat.refreshing ? 'animate-spin' : ''}`}
-                      style={{ color: theme.colors.text.secondary }}
-                    />
-                  </button>
-                </div>
-                <p className="text-2xl font-semibold mt-1" style={{ color: theme.colors.text.primary }}>
-                  {stat.value}
-                </p>
-                <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
-                  {stat.description}
-                </p>
-              </div>
-              <stat.icon className="h-8 w-8" style={{ color: theme.colors.text.secondary }} />
-            </div>
-          </div>
-        ))}
-      </div>
+  const handleRepositorySelect = async (owner: string, name: string) => {
+    try {
+      const repoDetails = await withGitHub(async (client) => {
+        return client.getRepository(owner, name);
+      });
+      setSelectedRepo(repoDetails);
+    } catch (error) {
+      console.error('Error fetching repository details:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load repository details.',
+        variant: 'destructive'
+      });
+    }
+  };
 
-      {/* Repository List */}
-      <div className="mt-6">
-        <RepositoryList />
-      </div>
-    </>
+  return (
+    <div className="flex">
+      {/* Main Content */}
+      <motion.div
+        layout
+        className={`flex-1 transition-all ${selectedRepo ? 'mr-80' : ''}`}
+      >
+        {/* Stats Grid */}
+        <motion.div
+          layout
+          className={`grid transition-all ${
+            selectedRepo
+              ? 'grid-cols-1 gap-2'
+              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'
+          }`}
+        >
+          {statCards.map((stat) => (
+            <motion.div
+              layout
+              key={stat.key}
+              className="p-4 rounded-lg"
+              style={{ backgroundColor: theme.colors.background.secondary }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      {stat.title}
+                    </p>
+                    <button
+                      onClick={stat.onRefresh}
+                      disabled={stat.refreshing}
+                      className="p-1 rounded-full hover:bg-gray-500/10 transition-colors"
+                      aria-label={`Refresh ${stat.title.toLowerCase()}`}
+                    >
+                      <RefreshCw
+                        className={`h-3 w-3 ${stat.refreshing ? 'animate-spin' : ''}`}
+                        style={{ color: theme.colors.text.secondary }}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-2xl font-semibold mt-1" style={{ color: theme.colors.text.primary }}>
+                    {stat.value}
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
+                    {stat.description}
+                  </p>
+                </div>
+                <stat.icon className="h-8 w-8" style={{ color: theme.colors.text.secondary }} />
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Repository List or Detail View */}
+        <motion.div layout className="mt-6">
+          {selectedRepo ? (
+            <RepositoryDetailView repository={selectedRepo} />
+          ) : (
+            <RepositoryList onRepositorySelect={handleRepositorySelect} />
+          )}
+        </motion.div>
+      </motion.div>
+
+      {/* Right Sidebar */}
+      <AnimatePresence>
+        {selectedRepo && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 320, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="fixed top-0 right-0 h-full p-4 border-l"
+            style={{
+              backgroundColor: theme.colors.background.primary,
+              borderColor: theme.colors.border.primary
+            }}
+          >
+            {/* Stats Cards */}
+            <div className="space-y-2">
+              {statCards.map((stat) => (
+                <motion.div
+                  key={stat.key}
+                  layout
+                  className="p-4 rounded-lg"
+                  style={{ backgroundColor: theme.colors.background.secondary }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                          {stat.title}
+                        </p>
+                        <button
+                          onClick={stat.onRefresh}
+                          disabled={stat.refreshing}
+                          className="p-1 rounded-full hover:bg-gray-500/10 transition-colors"
+                          aria-label={`Refresh ${stat.title.toLowerCase()}`}
+                        >
+                          <RefreshCw
+                            className={`h-3 w-3 ${stat.refreshing ? 'animate-spin' : ''}`}
+                            style={{ color: theme.colors.text.secondary }}
+                          />
+                        </button>
+                      </div>
+                      <p className="text-2xl font-semibold mt-1" style={{ color: theme.colors.text.primary }}>
+                        {stat.value}
+                      </p>
+                    </div>
+                    <stat.icon className="h-8 w-8" style={{ color: theme.colors.text.secondary }} />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

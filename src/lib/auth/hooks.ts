@@ -9,31 +9,32 @@ export function useUser() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Get initial user state
     const getUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
       } catch (error) {
         console.error('Error fetching user:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     getUser();
 
+    // Subscribe to auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        navigate('/');
-      }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, []);
 
   return { user, loading };
 }

@@ -12,6 +12,8 @@ import { SearchResultsDropdown } from '../search/search-results-dropdown';
 import { RepositoryActionModal } from '../search/repository-action-modal';
 import { toast } from '../../hooks/use-toast';
 import { useRecentRepositories } from '@/lib/hooks/use-recent-repositories';
+import { IssueProcessor } from '@/components/repository/issue-processor';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Repository {
   id: number;
@@ -38,6 +40,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const { recentlyTracked, recentlyAnalyzed, loading: recentLoading } = useRecentRepositories();
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [selectedAnalysisRepo, setSelectedAnalysisRepo] = useState<{ owner: string; name: string } | null>(null);
+  const [isAnalysisView, setIsAnalysisView] = useState(false);
 
   const handleSearch = useCallback(async () => {
     if (!user) {
@@ -132,6 +136,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const handleAnalyzeRepository = async (repo: Repository) => {
     setSelectedRepo(null);
     navigate(`/analyze/${repo.owner.login}/${repo.name}`);
+  };
+
+  const handleRepoClick = (owner: string, name: string) => {
+    setSelectedAnalysisRepo({ owner, name });
+    setIsAnalysisView(true);
   };
 
   useEffect(() => {
@@ -255,10 +264,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 border-r overflow-y-auto" style={{
-          backgroundColor: theme.colors.background.primary,
-          borderColor: theme.colors.border.primary
-        }}>
+        <motion.aside
+          className="border-r overflow-y-auto"
+          animate={{ width: isAnalysisView ? '240px' : '256px' }}
+          transition={{ duration: 0.3 }}
+          style={{
+            backgroundColor: theme.colors.background.primary,
+            borderColor: theme.colors.border.primary
+          }}
+        >
           {/* Recently Tracked Section */}
           <div className="pt-6 px-3">
             <h2 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
@@ -271,15 +285,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </div>
               ) : recentlyTracked.length > 0 ? (
                 recentlyTracked.map((repo) => (
-                  <Link
+                  <div
                     key={repo.id}
-                    to={`/tracked/${repo.owner}/${repo.name}`}
-                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10"
+                    onClick={() => handleRepoClick(repo.owner, repo.name)}
+                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
                     style={{ color: theme.colors.text.primary }}
                   >
                     <GitFork className="h-4 w-4 mr-2" />
                     <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
-                  </Link>
+                  </div>
                 ))
               ) : (
                 <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.secondary }}>
@@ -301,15 +315,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </div>
               ) : recentlyAnalyzed.length > 0 ? (
                 recentlyAnalyzed.map((repo) => (
-                  <Link
+                  <div
                     key={repo.id}
-                    to={`/analyze/${repo.owner}/${repo.name}`}
-                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10"
+                    onClick={() => handleRepoClick(repo.owner, repo.name)}
+                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
                     style={{ color: theme.colors.text.primary }}
                   >
                     <GitFork className="h-4 w-4 mr-2" />
                     <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
-                  </Link>
+                  </div>
                 ))
               ) : (
                 <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.secondary }}>
@@ -318,12 +332,102 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               )}
             </nav>
           </div>
-        </aside>
+        </motion.aside>
 
-        {/* Main content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        {/* Main content with animation */}
+        <AnimatePresence mode="wait">
+          {isAnalysisView && selectedAnalysisRepo ? (
+            <motion.div 
+              className="flex-1 flex"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Main content area */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                    {selectedAnalysisRepo.owner}/{selectedAnalysisRepo.name}
+                  </h1>
+                  <button
+                    onClick={() => setIsAnalysisView(false)}
+                    className="text-sm hover:opacity-80"
+                    style={{ color: theme.colors.text.secondary }}
+                  >
+                    ← Back to Dashboard
+                  </button>
+                </div>
+                <IssueProcessor
+                  repositoryId={`${selectedAnalysisRepo.owner}/${selectedAnalysisRepo.name}`}
+                  owner={selectedAnalysisRepo.owner}
+                  name={selectedAnalysisRepo.name}
+                />
+              </div>
+
+              {/* Right sidebar */}
+              <motion.div
+                className="w-80 border-l overflow-y-auto p-4"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: 320, opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                style={{ borderColor: theme.colors.border.primary }}
+              >
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                      Analysis Actions
+                    </h3>
+                    <button
+                      className="w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                      style={{ 
+                        backgroundColor: theme.colors.brand.primary,
+                        color: theme.colors.text.primary
+                      }}
+                    >
+                      Start Analysis
+                    </button>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
+                      Repository Stats
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                          Last Analysis
+                        </span>
+                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>
+                          Never
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                          Issues Found
+                        </span>
+                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>
+                          0
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              className="flex-1 overflow-y-auto p-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {children}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Action Modal */}
