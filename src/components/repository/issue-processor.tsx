@@ -353,21 +353,21 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         />
         <RepoStatsCard
           id="duplicateIssues"
-          title="Duplicate Issues"
+          title="Duplicate Issues - Coming Soon™"
           value={duplicateCount.toString()}
           description="From last analysis"
           icon={GitMerge}
         />
         <RepoStatsCard
           id="estimatedDuplicates"
-          title="Estimated Duplicates"
+          title="Est. Duplicates - Coming Soon™"
           value="0"
           description="Based on historical trends"
           icon={GitBranch}
         />
         <RepoStatsCard
           id="averageIssues"
-          title="Average Age"
+          title="Average Age - Coming Soon™"
           value="0"
           description="Per open issue"
           icon={AlertCircle}
