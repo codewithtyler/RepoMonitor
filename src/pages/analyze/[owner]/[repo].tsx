@@ -20,4 +20,4 @@ export function AnalyzePage() {
       />
     </div>
   );
-} 
+}

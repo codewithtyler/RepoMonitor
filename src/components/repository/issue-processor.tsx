@@ -29,74 +29,105 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string>('');
+  const [isComplete, setIsComplete] = useState(false);
   const { withGitHub } = useGitHub();
 
   const processIssues = async () => {
     try {
+      console.log('Starting analysis for:', owner, name);
       setLoading(true);
+      setIsComplete(false);
       setStatus('Fetching issues...');
       setProgress(0);
 
       // Get all issues
+      console.log('Fetching issues from GitHub...');
       const issues = await withGitHub(async (client: GitHubClient) => {
+        console.log('GitHub client initialized');
         const allIssues: Issue[] = [];
         let page = 1;
         let hasMore = true;
 
         while (hasMore) {
-          const response = await client.listRepositoryIssues(owner, name, {
-            state: 'all',
-            per_page: 100,
-            page
-          });
+          console.log('Fetching page', page);
+          try {
+            const response = await client.searchRepositoryIssues(owner, name, {
+              state: 'open',
+              per_page: 100,
+              page
+            });
 
-          const pageIssues = response.data.map((issue: {
-            id: number;
-            number: number;
-            title: string;
-            body: string | null;
-            state: string;
-            labels: Array<{ name: string } | string>;
-          }): Issue => ({
-            id: issue.id,
-            number: issue.number,
-            title: issue.title,
-            body: issue.body || '',
-            labels: issue.labels.map(label => ({
-              name: typeof label === 'string' ? label : label.name
-            })),
-            state: issue.state
-          }));
+            // Log total count on first page
+            if (page === 1) {
+              console.log('Total issues found:', response.total_count);
+            }
 
-          if (pageIssues.length === 0) {
+            const issues = response?.items || [];
+            console.log('Received', issues.length, 'issues');
+
+            if (!issues || issues.length === 0) {
+              console.log('No more issues found');
+              hasMore = false;
+              break;
+            }
+
+            const pageIssues = issues.map((issue: {
+              id: number;
+              number: number;
+              title: string;
+              body: string | null;
+              state: string;
+              labels: Array<{ name: string } | string>;
+            }): Issue => ({
+              id: issue.id,
+              number: issue.number,
+              title: issue.title,
+              body: issue.body || '',
+              labels: issue.labels.map(label => ({
+                name: typeof label === 'string' ? label : label.name
+              })),
+              state: issue.state
+            }));
+
+            if (pageIssues.length === 0) {
+              hasMore = false;
+            } else {
+              allIssues.push(...pageIssues);
+              page++;
+            }
+          } catch (error) {
+            console.error('Error fetching issues:', error);
             hasMore = false;
-          } else {
-            allIssues.push(...pageIssues);
-            page++;
           }
         }
 
+        console.log('Total issues fetched:', allIssues.length);
         return allIssues;
       });
 
       if (!issues) return;
 
-      // Filter for enhancement-labeled issues
-      const enhancements = issues.filter((issue: Issue) =>
-        issue.labels.some((label: Label) =>
-          label.name.toLowerCase().includes('enhancement') ||
-          label.name.toLowerCase().includes('feature')
-        )
-      );
-
       setStatus('Creating analysis job...');
       setProgress(20);
+
+      // Get or create repository record
+      const { data: repository, error: repoError } = await supabase
+        .from('repositories')
+        .upsert({
+          owner,
+          name,
+          github_id: `${owner}/${name}`
+        })
+        .select()
+        .single();
+
+      if (repoError) throw repoError;
 
       // Create analysis job
       const { data: job, error: jobError } = await supabase
         .from('analysis_jobs')
         .insert({
-          repository_id: repositoryId,
+          repository_id: repository.id,
           status: 'queued'
         })
         .select()
@@ -104,17 +135,22 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
 
       if (jobError) throw jobError;
 
+      console.log('Analysis job created:', job);
+
       setStatus('Processing issues...');
       setProgress(40);
 
       // Create job items for each issue
-      const jobItems = enhancements.map((issue: Issue) => ({
+      const jobItems = issues.map((issue: Issue) => ({
         job_id: job.id,
         issue_number: issue.number,
         issue_title: issue.title,
         issue_body: issue.body,
+        labels: issue.labels.map(label => label.name),
         status: 'queued'
       }));
+
+      console.log(`Created ${jobItems.length} job items`);
 
       // Insert in batches of 50
       for (let i = 0; i < jobItems.length; i += 50) {
@@ -128,64 +164,99 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         setProgress(40 + Math.floor((i / jobItems.length) * 30));
       }
 
+      console.log('All job items inserted');
+
       setStatus('Analysis queued');
-      setProgress(100);
+      setProgress(70);
 
       toast({
         title: 'Analysis Started',
-        description: `Processing ${enhancements.length} enhancement issues.`,
+        description: `Processing ${issues.length} issues.`,
       });
     } catch (error) {
+      console.error('Error in processIssues:', error);
+      setIsComplete(true);
+      setLoading(false);
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to process issues',
         variant: 'destructive'
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   // Monitor job progress
   useEffect(() => {
-    const channel = supabase
-      .channel('analysis_progress')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'analysis_jobs',
-          filter: `repository_id=eq.${repositoryId}`
-        },
-        (payload) => {
-          const job = payload.new;
-          if (job.status === 'processing') {
-            setStatus(job.current_step?.replace(/_/g, ' ') || 'Processing...');
-            setProgress(job.progress || 0);
-          } else if (job.status === 'completed') {
-            setStatus('Analysis complete');
-            setProgress(100);
-            toast({
-              title: 'Analysis Complete',
-              description: 'Your repository analysis is ready to view.',
-            });
-          } else if (job.status === 'failed') {
-            setStatus('Analysis failed');
-            toast({
-              title: 'Analysis Failed',
-              description: job.error || 'An error occurred during analysis',
-              variant: 'destructive'
-            });
+    let channel: ReturnType<typeof supabase.channel>;
+
+    const setupSubscription = async () => {
+      // Get repository ID from database
+      const { data: repository } = await supabase
+        .from('repositories')
+        .select('id')
+        .eq('owner', owner)
+        .eq('name', name)
+        .single();
+
+      if (!repository) return;
+
+      console.log('Setting up real-time subscription for repository:', repository.id);
+
+      channel = supabase
+        .channel('analysis_progress')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'analysis_jobs',
+            filter: `repository_id=eq.${repository.id}`
+          },
+          (payload) => {
+            console.log('Received job update:', payload);
+            const job = payload.new;
+            if (job.status === 'processing') {
+              setLoading(false);
+              setStatus(job.current_step?.replace(/_/g, ' ') || 'Processing...');
+              setProgress(job.progress || 0);
+              setIsComplete(false);
+              console.log('Job processing:', job.current_step, job.progress);
+            } else if (job.status === 'completed') {
+              setStatus('Analysis complete');
+              setProgress(100);
+              setIsComplete(true);
+              setLoading(false);
+              console.log('Job completed');
+              toast({
+                title: 'Analysis Complete',
+                description: 'Your repository analysis is ready to view.',
+              });
+            } else if (job.status === 'failed') {
+              setStatus('Analysis failed');
+              setIsComplete(true);
+              setLoading(false);
+              console.log('Job failed:', job.error);
+              toast({
+                title: 'Analysis Failed',
+                description: job.error || 'An error occurred during analysis',
+                variant: 'destructive'
+              });
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe((status) => {
+          console.log('Subscription status:', status);
+        });
+    };
+
+    setupSubscription();
 
     return () => {
-      channel.unsubscribe();
+      if (channel) {
+        channel.unsubscribe();
+      }
     };
-  }, [repositoryId]);
+  }, [owner, name]);
 
   return (
     <div className="space-y-4">
@@ -213,7 +284,7 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         </button>
       </div>
 
-      {(loading || progress > 0) && (
+      {(loading || progress > 0) && !isComplete && (
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span style={{ color: theme.colors.text.secondary }}>{status}</span>

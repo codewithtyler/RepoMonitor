@@ -210,7 +210,7 @@ class GitHubClientImpl implements GitHubClient {
   }
 
   async searchRepositoryIssues(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number } = {}) {
-    const query = `repo:${owner}/${repo} is:issue is:${options.state || 'open'}`;
+    const query = `repo:${owner}/${repo} is:issue -is:pr is:${options.state || 'open'}`;
     const params = new URLSearchParams({
       q: query,
       per_page: (options.per_page || 100).toString(),

@@ -412,16 +412,56 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                 className="w-80 border-l"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay: 1.4 }}
+                transition={{ duration: 0.3 }}
                 style={{
-                  borderColor: theme.colors.border.primary
+                  borderColor: theme.colors.border.primary,
+                  backgroundColor: theme.colors.background.primary
                 }}
-              />
+              >
+                {/* Repository Stats */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="p-4">
+                    <h2 className="text-sm font-medium mb-4" style={{ color: theme.colors.text.primary }}>
+                      Repository Stats
+                    </h2>
+                    <div className="flex items-center mb-4">
+                      <GitFork className="h-4 w-4 mr-2" style={{ color: theme.colors.text.secondary }} />
+                      <span className="text-sm" style={{ color: theme.colors.text.primary }}>
+                        {selectedAnalysisRepo?.owner}/{selectedAnalysisRepo?.name}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>Last Analysis</span>
+                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>Never</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>Issues Found</span>
+                        <span className="text-sm" style={{ color: theme.colors.text.primary }}>0</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Start Analysis Button */}
+                  <div className="px-4 pb-4">
+                    <button
+                      className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 transition-colors"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      Start Analysis
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
             )}
 
             {/* Stat Cards - These will animate between grid and sidebar */}
-            <div className={`${isAnalysisView ? 'absolute right-0 w-80' : 'p-6 w-full'}`}>
-              <div className={isAnalysisView ? 'px-4 pt-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
+            <div className={`${isAnalysisView ? 'absolute right-0 w-80 top-[208px]' : 'p-6 w-full'}`}>
+              <div className={isAnalysisView ? 'px-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
                 <StatCard
                   layoutId="stat-card-openIssues"
                   id="openIssues"
@@ -466,23 +506,6 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                   refreshing={stats?.refreshing?.activeAutomations}
                   variant={isAnalysisView ? 'compact' : 'default'}
                 />
-
-                {isAnalysisView && (
-                  <div className="mt-6">
-                    <h3 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.primary }}>
-                      Analysis Actions
-                    </h3>
-                    <button
-                      className="w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                      style={{
-                        backgroundColor: theme.colors.brand.primary,
-                        color: theme.colors.text.primary
-                      }}
-                    >
-                      Start Analysis
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </motion.div>
