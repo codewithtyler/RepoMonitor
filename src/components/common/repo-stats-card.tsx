@@ -1,8 +1,9 @@
 import { LucideIcon } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { theme } from '@/config/theme';
 import { StatCard } from './stat-card';
 
 interface RepoStatsCardProps {
-  layoutId?: string;
   id: string;
   title: string;
   value: string;
@@ -14,5 +15,14 @@ interface RepoStatsCardProps {
 }
 
 export function RepoStatsCard(props: RepoStatsCardProps) {
-  return <StatCard {...props} />;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      <StatCard {...props} />
+    </motion.div>
+  );
 }

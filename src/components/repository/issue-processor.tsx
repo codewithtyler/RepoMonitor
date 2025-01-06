@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle, GitPullRequest, GitMerge, GitBranch } from 'lucide-react';
 import { RepoStatsCard } from '@/components/common/repo-stats-card';
 import type { GitHubClient } from '@/lib/github';
+import { motion } from 'framer-motion';
 
 interface IssueProcessorProps {
   repositoryId: string;
@@ -39,7 +40,14 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
   const [isComplete, setIsComplete] = useState(false);
   const [openIssuesCount, setOpenIssuesCount] = useState<number>(0);
   const [duplicateCount, setDuplicateCount] = useState<number>(0);
+  const [mounted, setMounted] = useState(false);
   const { withGitHub } = useGitHub();
+
+  // Handle initial mount
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   // Fetch open issues count
   useEffect(() => {
@@ -323,10 +331,19 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
     };
   }, [owner, name]);
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       {/* Repository Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <motion.div 
+        className="grid grid-cols-4 gap-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
         <RepoStatsCard
           id="openIssues"
           title="Open Issues"
@@ -355,7 +372,7 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
           description="Per open issue"
           icon={AlertCircle}
         />
-      </div>
+      </motion.div>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

@@ -84,6 +84,8 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
   const statsCardsRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   const handleSearch = useCallback(async () => {
     if (!user) {
@@ -261,6 +263,34 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
     navigate('/', { replace: true });
   };
 
+  // Reset animation states when view changes
+  useEffect(() => {
+    setIsAnimating(false);
+    setShowSidebar(false);
+    setShowStats(false);
+  }, [isAnalysisView]);
+
+  // Control animation sequence
+  useEffect(() => {
+    if (isAnalysisView) {
+      // Wait for GlobalStatsCard movement to complete
+      const sidebarTimer = setTimeout(() => {
+        setShowSidebar(true);
+        // Wait for sidebar fade-in
+        const statsTimer = setTimeout(() => {
+          setShowStats(true);
+          // Wait for stats fade-in
+          const contentTimer = setTimeout(() => {
+            setIsAnimating(true);
+          }, 300); // Stats fade duration
+          return () => clearTimeout(contentTimer);
+        }, 300); // Sidebar fade duration
+        return () => clearTimeout(statsTimer);
+      }, 200); // GlobalStatsCard movement duration
+      return () => clearTimeout(sidebarTimer);
+    }
+  }, [isAnalysisView]);
+
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: theme.colors.background.primary }}>
       {/* Top Navigation Bar */}
@@ -420,47 +450,51 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
         </aside>
 
         {/* Main content with animation */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             className="flex-1 flex relative"
             initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
           >
             {/* Analysis View Content */}
             {isAnalysisView && selectedAnalysisRepo && (
-              <div className="flex-1 overflow-y-auto p-6">
+              <div className="flex-1 relative">
                 <motion.div
+                  className="absolute inset-0 overflow-y-auto"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 1 }}
+                  animate={{ opacity: isAnimating ? 1 : 0 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  <div className="mb-6 flex items-center justify-between">
-                    <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-                      {selectedAnalysisRepo.owner}/{selectedAnalysisRepo.name}
-                    </h1>
-                    <button
-                      onClick={() => setIsAnalysisView(false)}
-                      className="text-sm hover:opacity-80"
-                      style={{ color: theme.colors.text.secondary }}
-                    >
-                      ← Back to Dashboard
-                    </button>
+                  <div className="p-6">
+                    <div className="mb-6 flex items-center justify-between">
+                      <h1 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
+                        {selectedAnalysisRepo.owner}/{selectedAnalysisRepo.name}
+                      </h1>
+                      <button
+                        onClick={() => setIsAnalysisView(false)}
+                        className="text-sm hover:opacity-80"
+                        style={{ color: theme.colors.text.secondary }}
+                      >
+                        ← Back to Dashboard
+                      </button>
+                    </div>
+                    <IssueProcessor
+                      repositoryId={selectedAnalysisRepo.id!}
+                      owner={selectedAnalysisRepo.owner}
+                      name={selectedAnalysisRepo.name}
+                    />
                   </div>
-                  <IssueProcessor
-                    repositoryId={selectedAnalysisRepo.id!}
-                    owner={selectedAnalysisRepo.owner}
-                    name={selectedAnalysisRepo.name}
-                  />
                 </motion.div>
               </div>
             )}
 
-            {/* Right sidebar border */}
+            {/* Right sidebar */}
             {isAnalysisView && (
               <motion.div
                 className="w-[300px] border-l"
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                animate={{ opacity: showSidebar ? 1 : 0 }}
                 transition={{ duration: 0.3 }}
                 style={{
                   borderColor: theme.colors.border.primary,
@@ -470,8 +504,8 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                 {/* Repository Stats */}
                 <motion.div
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
+                  animate={{ opacity: showStats ? 1 : 0 }}
+                  transition={{ duration: 0.3 }}
                 >
                   <div className="p-4">
                     <h2 className="text-sm font-medium mb-4" style={{ color: theme.colors.text.primary }}>
@@ -508,8 +542,18 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
               </motion.div>
             )}
 
-            {/* Stat Cards - These will animate between grid and sidebar */}
-            <div className={`${isAnalysisView ? 'absolute right-0 w-[300px] top-[208px]' : 'p-6 w-full'}`}>
+            {/* Stat Cards Container */}
+            <motion.div
+              key={isAnalysisView ? 'analysis' : 'dashboard'}
+              className={`${isAnalysisView ? 'absolute right-0 w-[300px] top-[208px]' : 'p-6 w-full'}`}
+              layout
+              transition={{
+                layout: {
+                  duration: 0.2,
+                  ease: "easeInOut"
+                }
+              }}
+            >
               <div className={isAnalysisView ? 'px-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
                 <GlobalStatsCard
                   layoutId="stat-card-openIssues"
@@ -556,7 +600,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                   variant={isAnalysisView ? 'compact' : 'default'}
                 />
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </AnimatePresence>
       </div>
