@@ -352,10 +352,11 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
             {/* Dropdown */}
             {isDropdownOpen && (
               <div
-                className="absolute right-0 mt-2 w-48 rounded-lg border py-1"
+                className="absolute right-0 mt-2 w-48 rounded-lg border py-1 shadow-lg"
                 style={{
                   backgroundColor: theme.colors.background.secondary,
-                  borderColor: theme.colors.border.primary
+                  borderColor: theme.colors.border.primary,
+                  zIndex: 9999
                 }}
               >
                 <div className="px-4 py-2 text-sm" style={{ color: theme.colors.text.secondary }}>

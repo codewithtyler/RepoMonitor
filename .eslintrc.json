@@ -5,12 +5,19 @@
     "plugin:react/recommended",
     "plugin:react-hooks/recommended"
   ],
-  "plugins": ["react", "react-hooks", "@typescript-eslint"],
+  "plugins": [
+    "react",
+    "react-hooks",
+    "@typescript-eslint"
+  ],
   "rules": {
     "react/react-in-jsx-scope": "off",
     "no-trailing-spaces": "error",
     "@typescript-eslint/no-explicit-any": "warn",
-    "eol-last": ["error", "always"]
+    "eol-last": [
+      "error",
+      "always"
+    ]
   },
   "settings": {
     "react": {

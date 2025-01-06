@@ -83,11 +83,8 @@ export function useGitHub() {
 
     setLoading(true);
     try {
-      console.log('[GitHub Client] Getting GitHub client for user:', user.id);
       const client = await getGitHubClient(user.id);
-      console.log('[GitHub Client] Successfully got client, executing operation');
       const result = await operation(client);
-      console.log('[GitHub Client] Operation completed successfully');
       return result;
     } catch (error) {
       console.error('[GitHub Client] Operation failed:', error);
