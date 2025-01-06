@@ -15,6 +15,7 @@ import { useRecentRepositories } from '@/lib/hooks/use-recent-repositories';
 import { IssueProcessor } from '@/components/repository/issue-processor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StatCard } from '@/components/common/stat-card';
+import { GlobalStatsCard } from '@/components/common/global-stats-card';
 
 interface Repository {
   id: number;
@@ -462,7 +463,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
             {/* Stat Cards - These will animate between grid and sidebar */}
             <div className={`${isAnalysisView ? 'absolute right-0 w-80 top-[208px]' : 'p-6 w-full'}`}>
               <div className={isAnalysisView ? 'px-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
-                <StatCard
+                <GlobalStatsCard
                   layoutId="stat-card-openIssues"
                   id="openIssues"
                   title="Open Issues"
@@ -473,7 +474,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                   refreshing={stats?.refreshing?.openIssues}
                   variant={isAnalysisView ? 'compact' : 'default'}
                 />
-                <StatCard
+                <GlobalStatsCard
                   layoutId="stat-card-trackedRepos"
                   id="trackedRepos"
                   title="Tracked Repos"
@@ -484,7 +485,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                   refreshing={stats?.refreshing?.trackedRepos}
                   variant={isAnalysisView ? 'compact' : 'default'}
                 />
-                <StatCard
+                <GlobalStatsCard
                   layoutId="stat-card-analyzedRepos"
                   id="analyzedRepos"
                   title="Analyzed Repos"
@@ -495,7 +496,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                   refreshing={stats?.refreshing?.analyzedRepos}
                   variant={isAnalysisView ? 'compact' : 'default'}
                 />
-                <StatCard
+                <GlobalStatsCard
                   layoutId="stat-card-activeAutomations"
                   id="activeAutomations"
                   title="Active Automations"
