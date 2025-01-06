@@ -11,7 +11,8 @@ export const theme = {
     },
     background: {
       primary: '#0d1117',
-      secondary: '#161b22'
+      secondary: '#161b22',
+      tooltip: '#1c2128'
     },
     border: {
       primary: '#30363d',

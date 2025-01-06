@@ -16,6 +16,7 @@ import { IssueProcessor } from '@/components/repository/issue-processor';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StatCard } from '@/components/common/stat-card';
 import { GlobalStatsCard } from '@/components/common/global-stats-card';
+import { Tooltip } from '@/components/common/tooltip';
 
 interface Repository {
   id: number;
@@ -74,7 +75,11 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
   const [selectedRepo, setSelectedRepo] = useState<Repository | null>(null);
   const { recentlyTracked, recentlyAnalyzed, loading: recentLoading } = useRecentRepositories();
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  const [selectedAnalysisRepo, setSelectedAnalysisRepo] = useState<{ owner: string; name: string } | null>(null);
+  const [selectedAnalysisRepo, setSelectedAnalysisRepo] = useState<{
+    owner: string;
+    name: string;
+    id?: string;
+  } | null>(null);
   const [isAnalysisView, setIsAnalysisView] = useState(false);
   const statsCardsRef = useRef<HTMLDivElement>(null);
   const rightSidebarRef = useRef<HTMLDivElement>(null);
@@ -82,11 +87,17 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
 
   const handleSearch = useCallback(async () => {
     if (!user) {
-      navigate('/');
+      console.log('[Step 2] Search aborted: No user found');
+      toast({
+        title: 'Session Expired',
+        description: 'Please sign in again to continue.',
+        variant: 'destructive'
+      });
       return;
     }
 
     try {
+      console.log('[Step 2] Searching GitHub repositories with query:', searchQuery);
       const results = await withGitHub(async (client) => {
         const response = await client.listUserRepositories({
           sort: 'updated',
@@ -97,16 +108,19 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
       });
 
       if (results) {
+        console.log('[Step 2 Success] Found repositories:', results.length);
         setSearchResults(results);
         setShowSearchDropdown(true);
       }
     } catch (error: any) {
-      console.error('Error searching repositories:', error);
-      if (error?.status === 401) {
-        navigate('/');
-      }
+      console.error('[Step 2 Error] Error searching repositories:', error);
+      toast({
+        title: 'Search Error',
+        description: 'Unable to search repositories. Please try again.',
+        variant: 'destructive'
+      });
     }
-  }, [user, navigate, withGitHub, searchQuery, setSearchResults, setShowSearchDropdown]);
+  }, [user, withGitHub, searchQuery, setSearchResults, setShowSearchDropdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -123,12 +137,14 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
 
   const handleTrackRepository = async (repo: Repository) => {
     try {
+      console.log('[Step 3] Checking repository access:', { owner: repo.owner.login, name: repo.name });
       // Check if we have access and get permissions
       const access = await withGitHub((client) =>
         client.checkRepositoryAccess(repo.owner.login, repo.name)
       );
 
       if (!access?.hasAccess) {
+        console.log('[Step 3 Failed] No access to repository');
         toast({
           title: 'Access Error',
           description: 'You no longer have access to this repository.',
@@ -137,6 +153,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
         return;
       }
 
+      console.log('[Step 3 Success] Repository access confirmed, adding to tracking');
       // Add repository to tracking
       const { error } = await supabase
         .from('repositories')
@@ -152,6 +169,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
 
       if (error) throw error;
 
+      console.log('[Step 3 Complete] Repository added to tracking');
       toast({
         title: 'Repository Added',
         description: `Now tracking ${repo.owner.login}/${repo.name}`,
@@ -161,7 +179,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
       setSearchQuery('');
       setSearchResults([]);
     } catch (error) {
-      console.error('Error tracking repository:', error);
+      console.error('[Step 3 Error] Error tracking repository:', error);
       toast({
         title: 'Error',
         description: 'Failed to track repository. Please try again.',
@@ -176,8 +194,38 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
   };
 
   const handleRepoClick = async (owner: string, name: string) => {
-    setSelectedAnalysisRepo({ owner, name });
-    setIsAnalysisView(true);
+    try {
+      console.log('[Step 1] Fetching repository ID from Supabase:', { owner, name });
+      // Then try to get the repository ID
+      const { data: repoData } = await supabase
+        .from('repositories')
+        .select('id')
+        .eq('owner', owner)
+        .eq('name', name)
+        .single();
+
+      if (!repoData?.id) {
+        console.log('[Step 1 Failed] Repository not found in database');
+        toast({
+          title: 'Repository Not Found',
+          description: 'This repository is no longer being tracked. Try searching for it again.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      console.log('[Step 1 Success] Found repository ID:', repoData.id);
+      // Only set the view state if we successfully found the repository
+      setSelectedAnalysisRepo({ owner, name, id: repoData.id });
+      setIsAnalysisView(true);
+    } catch (error) {
+      console.error('[Step 1 Error] Error getting repository:', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to load repository details. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   useEffect(() => {
@@ -301,10 +349,8 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <motion.aside
-          className="border-r overflow-y-auto"
-          animate={{ width: isAnalysisView ? '240px' : '256px' }}
-          transition={{ duration: 0.3 }}
+        <aside
+          className="w-[300px] border-r overflow-y-auto"
           style={{
             backgroundColor: theme.colors.background.primary,
             borderColor: theme.colors.border.primary
@@ -322,15 +368,16 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                 </div>
               ) : recentlyTracked.length > 0 ? (
                 recentlyTracked.map((repo) => (
-                  <div
-                    key={repo.id}
-                    onClick={() => handleRepoClick(repo.owner, repo.name)}
-                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
-                    style={{ color: theme.colors.text.primary }}
-                  >
-                    <GitFork className="h-4 w-4 mr-2" />
-                    <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
-                  </div>
+                  <Tooltip key={repo.id} content={`${repo.owner}/${repo.name}`}>
+                    <div
+                      onClick={() => handleRepoClick(repo.owner, repo.name)}
+                      className="mx-3 flex items-center py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      <GitFork className="h-4 w-4 min-w-[16px] ml-3 mr-2" />
+                      <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
+                    </div>
+                  </Tooltip>
                 ))
               ) : (
                 <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.secondary }}>
@@ -352,15 +399,16 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                 </div>
               ) : recentlyAnalyzed.length > 0 ? (
                 recentlyAnalyzed.map((repo) => (
-                  <div
-                    key={repo.id}
-                    onClick={() => handleRepoClick(repo.owner, repo.name)}
-                    className="flex items-center px-3 py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
-                    style={{ color: theme.colors.text.primary }}
-                  >
-                    <GitFork className="h-4 w-4 mr-2" />
-                    <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
-                  </div>
+                  <Tooltip key={repo.id} content={`${repo.owner}/${repo.name}`}>
+                    <div
+                      onClick={() => handleRepoClick(repo.owner, repo.name)}
+                      className="mx-3 flex items-center py-2 rounded-lg transition-colors hover:bg-gray-500/10 cursor-pointer"
+                      style={{ color: theme.colors.text.primary }}
+                    >
+                      <GitFork className="h-4 w-4 min-w-[16px] ml-3 mr-2" />
+                      <span className="text-sm truncate">{repo.owner}/{repo.name}</span>
+                    </div>
+                  </Tooltip>
                 ))
               ) : (
                 <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.secondary }}>
@@ -369,7 +417,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
               )}
             </nav>
           </div>
-        </motion.aside>
+        </aside>
 
         {/* Main content with animation */}
         <AnimatePresence mode="wait">
@@ -399,7 +447,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
                     </button>
                   </div>
                   <IssueProcessor
-                    repositoryId={`${selectedAnalysisRepo.owner}/${selectedAnalysisRepo.name}`}
+                    repositoryId={selectedAnalysisRepo.id!}
                     owner={selectedAnalysisRepo.owner}
                     name={selectedAnalysisRepo.name}
                   />
@@ -410,7 +458,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
             {/* Right sidebar border */}
             {isAnalysisView && (
               <motion.div
-                className="w-80 border-l"
+                className="w-[300px] border-l"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
@@ -461,7 +509,7 @@ export function DashboardLayout({ children, stats, onRefreshStats }: DashboardLa
             )}
 
             {/* Stat Cards - These will animate between grid and sidebar */}
-            <div className={`${isAnalysisView ? 'absolute right-0 w-80 top-[208px]' : 'p-6 w-full'}`}>
+            <div className={`${isAnalysisView ? 'absolute right-0 w-[300px] top-[208px]' : 'p-6 w-full'}`}>
               <div className={isAnalysisView ? 'px-4 space-y-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4'}>
                 <GlobalStatsCard
                   layoutId="stat-card-openIssues"

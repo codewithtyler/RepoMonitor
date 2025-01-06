@@ -31,7 +31,7 @@ export function SearchResultsDropdown({
 
   return (
     <div
-      className="absolute top-full left-1/2 -translate-x-1/2 w-[600px] mt-1 rounded-lg border overflow-hidden max-h-[400px] overflow-y-auto"
+      className="absolute top-full left-0 right-0 mt-2 rounded-lg border overflow-hidden z-50"
       style={{
         backgroundColor: theme.colors.background.secondary,
         borderColor: theme.colors.border.primary
