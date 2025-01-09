@@ -1,5 +1,6 @@
 import { GitFork, Star } from 'lucide-react';
 import { theme } from '@/config/theme';
+import { formatNumber } from '@/lib/utils/format';
 
 interface Repository {
   id: number;
@@ -42,12 +43,12 @@ export function SearchResultsDropdown({
           Searching repositories...
         </div>
       ) : (
-        <div>
+        <div className="max-h-[300px] overflow-y-auto">
           {results.map((repo) => (
             <button
               key={repo.id}
               onClick={() => onSelect(repo)}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-500/10 flex items-center justify-between group"
+              className="w-full px-3 py-1.5 text-left hover:bg-gray-500/10 flex items-center justify-between"
             >
               <div className="flex items-center min-w-0">
                 <GitFork className="h-4 w-4 mr-2 shrink-0" style={{ color: theme.colors.text.secondary }} />
@@ -63,17 +64,28 @@ export function SearchResultsDropdown({
               </div>
               {repo.stargazers_count > 0 && (
                 <div
-                  className="ml-4 flex items-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="ml-4 flex items-center text-xs"
                   style={{ color: theme.colors.text.secondary }}
                 >
                   <Star className="h-3 w-3 mr-1" />
-                  {repo.stargazers_count}
+                  {formatNumber(repo.stargazers_count)}
                 </div>
               )}
             </button>
           ))}
+          {results.length === 10 && (
+            <div
+              className="px-3 py-2 text-xs text-center border-t"
+              style={{
+                color: theme.colors.text.secondary,
+                borderColor: theme.colors.border.primary
+              }}
+            >
+              Showing top 10 results. Refine your search to find more repositories.
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-} 
+}

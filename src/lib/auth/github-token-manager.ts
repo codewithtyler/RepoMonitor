@@ -33,7 +33,7 @@ export class GitHubTokenManager {
         user_id: userId,
         token: cleanToken,
         expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
-        scopes: ['repo', 'public_repo'],
+        scopes: ['repo', 'read:user'],
         last_refresh: new Date().toISOString()
       }, {
         onConflict: 'user_id'

@@ -3,8 +3,10 @@ import { GlobalStatsCard } from '../components/common/global-stats-card';
 import { RecentRepositoriesCard } from '../components/repository/recent-repositories-card';
 import { Loader2 } from 'lucide-react';
 import { getAuthState } from '../lib/auth/global-state';
-import { ErrorBoundary } from 'react-error-boundary';
-import { Suspense, useEffect, useState } from 'react';
+import { HeaderLogo } from '../components/layout/header-logo';
+import { NotificationDropdown } from '../components/common/notification-dropdown';
+import { SearchBar } from '../components/search/search-bar';
+import { UserProfile } from '../components/common/user-profile';
 import { theme } from '../config/theme';
 
 // Note: This project uses plain React + TailwindCSS.
@@ -69,67 +71,84 @@ function DashboardContent() {
     console.log('[Dashboard/Content] About to render dashboard with repositories:', repositories.length);
 
     const content = (
-      <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: theme.colors.background.primary }}>
-        {/* Sidebar */}
-        <div className="w-64 flex flex-col border-r" style={{ borderColor: theme.colors.border.primary }}>
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.secondary }}>Recently Tracked</h2>
-                {repositories.length === 0 ? (
-                  <p className="text-sm" style={{ color: theme.colors.text.secondary }}>No repositories tracked yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {repositories.slice(0, 5).map(repo => (
-                      <div
-                        key={repo.id}
-                        className="px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
-                        style={{ backgroundColor: theme.colors.background.secondary }}
-                      >
-                        <p className="text-sm truncate" style={{ color: theme.colors.brand.secondary }}>{repo.owner}/{repo.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+      <div className="flex flex-col h-screen w-full" style={{ backgroundColor: theme.colors.background.primary }}>
+        {/* Navbar */}
+        <header className="border-b" style={{ borderColor: theme.colors.border.primary }}>
+          <div className="flex items-center justify-between px-4 h-14">
+            <div className="flex items-center gap-4 flex-1">
+              <HeaderLogo />
+              <SearchBar />
+            </div>
+            <div className="flex items-center gap-4">
+              <NotificationDropdown />
+              <UserProfile />
+            </div>
+          </div>
+        </header>
 
-              <div>
-                <h2 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.secondary }}>Recently Analyzed</h2>
-                {repositories.filter(r => r.lastAnalysisTimestamp).length === 0 ? (
-                  <p className="text-sm" style={{ color: theme.colors.text.secondary }}>No repositories analyzed yet</p>
-                ) : (
-                  <div className="space-y-1">
-                    {repositories
-                      .filter(r => r.lastAnalysisTimestamp)
-                      .sort((a, b) => new Date(b.lastAnalysisTimestamp!).getTime() - new Date(a.lastAnalysisTimestamp!).getTime())
-                      .slice(0, 5)
-                      .map(repo => (
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Sidebar */}
+          <div className="w-64 flex flex-col border-r" style={{ borderColor: theme.colors.border.primary }}>
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.secondary }}>Recently Tracked</h2>
+                  {repositories.length === 0 ? (
+                    <p className="text-sm" style={{ color: theme.colors.text.secondary }}>No repositories tracked yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {repositories.slice(0, 5).map(repo => (
                         <div
                           key={repo.id}
                           className="px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
                           style={{ backgroundColor: theme.colors.background.secondary }}
                         >
                           <p className="text-sm truncate" style={{ color: theme.colors.brand.secondary }}>{repo.owner}/{repo.name}</p>
-                          <p className="text-xs truncate mt-1" style={{ color: theme.colors.text.secondary }}>
-                            Last analyzed: Never
-                          </p>
                         </div>
                       ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-medium mb-2" style={{ color: theme.colors.text.secondary }}>Recently Analyzed</h2>
+                  {repositories.filter(r => r.lastAnalysisTimestamp).length === 0 ? (
+                    <p className="text-sm" style={{ color: theme.colors.text.secondary }}>No repositories analyzed yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {repositories
+                        .filter(r => r.lastAnalysisTimestamp)
+                        .sort((a, b) => new Date(b.lastAnalysisTimestamp!).getTime() - new Date(a.lastAnalysisTimestamp!).getTime())
+                        .slice(0, 5)
+                        .map(repo => (
+                          <div
+                            key={repo.id}
+                            className="px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors"
+                            style={{ backgroundColor: theme.colors.background.secondary }}
+                          >
+                            <p className="text-sm truncate" style={{ color: theme.colors.brand.secondary }}>{repo.owner}/{repo.name}</p>
+                            <p className="text-xs truncate mt-1" style={{ color: theme.colors.text.secondary }}>
+                              Last analyzed: Never
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="p-4">
-            <GlobalStatsCard repositories={repositories} />
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <h2 className="text-lg font-medium mb-4" style={{ color: theme.colors.text.primary }}>Recent Repositories</h2>
-            <RecentRepositoriesCard repositories={repositories} />
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-4">
+              <GlobalStatsCard repositories={repositories} />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <h2 className="text-lg font-medium mb-4" style={{ color: theme.colors.text.primary }}>Recent Repositories</h2>
+              <RecentRepositoriesCard repositories={repositories} />
+            </div>
           </div>
         </div>
       </div>

@@ -280,16 +280,18 @@ class GitHubClientImpl implements GitHubClient {
         repo.name.toLowerCase().includes(searchQuery)
       );
 
-      // Then get all other repositories
-      const query = encodeURIComponent(`${searchQuery} in:name`);
+      // Then get only public repositories from the global search
+      const query = encodeURIComponent(`${searchQuery} in:name is:public`);
       const searchResult = await this.withRetry(() =>
         this.request<GitHubSearchResult>(`/search/repositories?q=${query}&sort=stars&order=desc&per_page=100`)
       ).catch(() => ({ items: [] }));
 
       // Combine results, excluding duplicates
+      // User repos (including private ones they have access to) come first
       const allItems = [...matchingUserRepos];
+      // Then add public repos from search, excluding any duplicates
       for (const item of searchResult.items) {
-        if (!allItems.some(existing => existing.id === item.id)) {
+        if (!allItems.some(existing => existing.id === item.id) && !item.private) {
           allItems.push(item);
         }
       }
