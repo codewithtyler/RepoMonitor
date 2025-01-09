@@ -1,6 +1,6 @@
 import { Repository } from '@/types/repository';
 import { GitPullRequest, GitMerge, GitBranch, AlertCircle } from 'lucide-react';
-import { RepoStatsCard } from '@/components/repository/repo-stats-card';
+import { RepoStatsCard } from '@/components/common/repo-stats-card';
 
 interface GlobalStatsCardProps {
   repositories: Repository[];
