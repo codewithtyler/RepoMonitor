@@ -1,5 +1,11 @@
 import { AppRouter } from './routes';
+import { Toaster } from 'sonner';
 
 export function App() {
-  return <AppRouter />;
-} 
+  return (
+    <>
+      <AppRouter />
+      <Toaster position="top-right" />
+    </>
+  );
+}

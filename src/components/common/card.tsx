@@ -1,5 +1,9 @@
 import { theme } from '@/config/theme';
 
+// Note: This project uses plain React + TailwindCSS.
+// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
+// All components are built from scratch using TailwindCSS for styling.
+
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
@@ -8,7 +12,7 @@ export function Card({ children, className = '', ...props }: CardProps) {
   return (
     <div
       className={`rounded-lg border ${className}`}
-      style={{ 
+      style={{
         backgroundColor: theme.colors.background.secondary,
         borderColor: theme.colors.border.primary
       }}
@@ -29,7 +33,7 @@ export function CardHeader({ children, className = '', ...props }: CardProps) {
 
 export function CardTitle({ children, className = '', ...props }: CardProps) {
   return (
-    <h3 
+    <h3
       className={`text-sm font-medium ${className}`}
       style={{ color: theme.colors.text.primary }}
       {...props}
@@ -41,7 +45,7 @@ export function CardTitle({ children, className = '', ...props }: CardProps) {
 
 export function CardDescription({ children, className = '', ...props }: CardProps) {
   return (
-    <p 
+    <p
       className={`${className}`}
       style={{ color: theme.colors.text.secondary }}
       {...props}
@@ -49,4 +53,4 @@ export function CardDescription({ children, className = '', ...props }: CardProp
       {children}
     </p>
   );
-} 
+}

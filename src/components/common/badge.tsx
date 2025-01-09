@@ -1,5 +1,9 @@
 import * as React from "react";
 
+// Note: This project uses plain React + TailwindCSS.
+// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
+// All components are built from scratch using TailwindCSS for styling.
+
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: 'default' | 'secondary' | 'outline';
 }

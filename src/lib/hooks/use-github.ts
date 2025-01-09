@@ -1,102 +1,67 @@
-import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useRef, useEffect } from 'react';
 import { getGitHubClient } from '../github';
 import type { GitHubClient } from '@/lib/github';
-import { useUser } from '../auth/hooks';
-import { toast } from '../../hooks/use-toast';
+import { toast } from 'sonner';
+import { getAuthState, subscribeToAuth } from '../auth/global-state';
+
+// Using getAuthState() from global-state instead of useUser() hook
+// to prevent multiple Supabase requests across components.
+// This ensures all components share the same auth state.
 
 export function useGitHub() {
-  const [loading, setLoading] = useState(false);
-  const { user } = useUser();
-  const navigate = useNavigate();
+  const clientRef = useRef<GitHubClient | null>(null);
+  const authAttempted = useRef(false);
 
-  const handleGitHubError = useCallback((error: Error & { status?: number }) => {
-    // Auth specific errors
-    if (error.message === 'TOKEN_EXPIRED' || error.status === 401) {
-      toast({
-        title: 'Session Expired',
-        description: 'Please sign in again to continue.',
-        variant: 'destructive'
-      });
-      navigate('/auth');
-      return;
-    }
-
-    // Permission errors
-    if (error.status === 403 || error.message.includes('permission')) {
-      toast({
-        title: 'Permission Denied',
-        description: 'You don\'t have permission to perform this action.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Rate limit errors
-    if (error.message.includes('rate limit')) {
-      toast({
-        title: 'Rate Limit Exceeded',
-        description: 'Please wait a few minutes and try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Bad request errors (400)
-    if (error.status === 400) {
-      toast({
-        title: 'Invalid Request',
-        description: 'Unable to process this request. Please try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Not found errors (404)
-    if (error.status === 404) {
-      toast({
-        title: 'Not Found',
-        description: 'The requested resource was not found.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Generic error
-    toast({
-      title: 'Error',
-      description: error.message,
-      variant: 'destructive'
+  useEffect(() => {
+    // Initialize client when auth state changes
+    const unsubscribe = subscribeToAuth(async ({ user }) => {
+      if (user && !clientRef.current) {
+        try {
+          clientRef.current = await getGitHubClient(user.id);
+        } catch (error) {
+          console.error('Failed to initialize GitHub client:', error);
+          clientRef.current = null;
+        }
+      } else if (!user) {
+        clientRef.current = null;
+      }
     });
-  }, [navigate]);
 
-  const withGitHub = useCallback(async <T>(operation: (client: GitHubClient) => Promise<T>): Promise<T | null> => {
+    return () => {
+      unsubscribe();
+      clientRef.current = null;
+    };
+  }, []);
+
+  const withGitHub = useCallback(async <T>(fn: (client: GitHubClient) => Promise<T>): Promise<T | null> => {
+    const { user } = getAuthState();
+
     if (!user) {
-      console.log('[GitHub Client] Operation aborted: No user found');
-      toast({
-        title: 'Authentication Required',
-        description: 'Please sign in to continue.',
-        variant: 'destructive'
-      });
+      if (!authAttempted.current) {
+        authAttempted.current = true;
+        toast.error('Authentication required');
+        window.location.href = '/';
+      }
       return null;
     }
 
-    setLoading(true);
     try {
-      const client = await getGitHubClient(user.id);
-      const result = await operation(client);
-      return result;
+      if (!clientRef.current) {
+        clientRef.current = await getGitHubClient(user.id);
+      }
+      return await fn(clientRef.current);
     } catch (error) {
-      console.error('[GitHub Client] Operation failed:', error);
-      handleGitHubError(error as Error);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [user, handleGitHubError]);
+      console.error('GitHub API error:', error);
+      clientRef.current = null;
 
-  return {
-    loading,
-    withGitHub
-  };
+      if (!authAttempted.current) {
+        authAttempted.current = true;
+        toast.error('Failed to access GitHub API');
+        window.location.href = '/';
+      }
+      return null;
+    }
+  }, []); // No dependencies since we use global state and refs
+
+  return { withGitHub };
 }

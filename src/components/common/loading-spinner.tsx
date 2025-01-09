@@ -1,3 +1,7 @@
+// Note: This project uses plain React + TailwindCSS.
+// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
+// All components are built from scratch using TailwindCSS for styling.
+
 import { Loader2 } from 'lucide-react';
 import { theme } from '@/config/theme';
 

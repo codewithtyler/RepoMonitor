@@ -210,14 +210,13 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
       status: "not-started"
     }
   ]);
-  const POLL_INTERVAL = 30000; // Fixed 30-second polling interval
 
   const checkJobStatus = useCallback(async () => {
     const { data: activeJob } = await supabase
       .from('analysis_jobs')
       .select('*')
       .eq('repository_id', repositoryId)
-      .eq('status', 'processing')
+      .in('status', ['fetching', 'processing', 'analyzing'])
       .single();
 
     if (!activeJob) {
@@ -251,6 +250,17 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         setLoading(false);
         setIsComplete(true);
         if (lastJob.status === 'failed') {
+          // Update failed job with completion time if not set
+          if (!lastJob.completed_at) {
+            await supabase
+              .from('analysis_jobs')
+              .update({
+                completed_at: new Date().toISOString(),
+                last_processed_at: new Date().toISOString()
+              })
+              .eq('id', lastJob.id);
+          }
+
           setStages(prevStages => prevStages.map(stage => ({
             ...stage,
             status: stage.status === 'in-progress' ? 'error' : stage.status,
@@ -282,7 +292,9 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
           .from('analysis_jobs')
           .update({
             status: 'cancelled',
-            error: 'Analysis exceeded maximum time limit of 15 minutes'
+            error: 'Analysis exceeded maximum time limit of 15 minutes',
+            last_processed_at: new Date().toISOString(),
+            completed_at: new Date().toISOString()
           })
           .eq('id', activeJob.id);
 
@@ -404,14 +416,114 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
     }
   }, [repositoryId, setStages, setIsComplete, setLoading, setCanResume]);
 
-  // Start polling on mount
+  // Start subscription on mount
   useEffect(() => {
-    checkJobStatus(); // Initial check
-    pollIntervalRef.current = window.setInterval(checkJobStatus, POLL_INTERVAL);
+    let channel: ReturnType<typeof supabase.channel>;
+    checkJobStatus(); // Initial check only
+
+    const setupSubscription = async () => {
+      const { data: repository } = await supabase
+        .from('repositories')
+        .select('*')
+        .eq('owner', owner)
+        .eq('name', name)
+        .single();
+
+      if (!repository) return;
+
+      channel = supabase
+        .channel('analysis_progress')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'analysis_jobs',
+            filter: `repository_id=eq.${repository.id}`
+          },
+          async (payload) => {
+            const job = payload.new;
+
+            // Check if analysis has exceeded timeout
+            if (job.created_at && job.status === 'processing') {
+              const startedAt = new Date(job.created_at).getTime();
+              const now = new Date().getTime();
+              if (now - startedAt >= ANALYSIS_TIMEOUT_MS) {
+                // Auto-cancel the analysis
+                await supabase
+                  .from('analysis_jobs')
+                  .update({
+                    status: 'cancelled',
+                    error: 'Analysis exceeded maximum time limit of 15 minutes'
+                  })
+                  .eq('id', job.id);
+
+                setStages(prevStages => prevStages.map(stage => ({
+                  ...stage,
+                  status: stage.status === 'in-progress' ? 'error' : stage.status,
+                  statusText: stage.status === 'in-progress' ? 'Analysis exceeded time limit' : stage.statusText
+                })));
+                setIsComplete(true);
+                setLoading(false);
+                setCanResume(true);
+                return;
+              }
+            }
+
+            // Rest of the existing switch case for processing_stage
+            switch (job.processing_stage) {
+              case 'fetching':
+                updateStageProgress(1, job.stage_progress,
+                  `Fetched ${job.processed_issues_count} of ${job.total_issues_count} issues...`);
+                break;
+              case 'embedding':
+                updateStageProgress(2, job.stage_progress,
+                  `Processed ${job.embedded_issues_count} of ${job.total_issues_count} issues...`);
+                break;
+              case 'analyzing':
+                updateStageProgress(3, job.stage_progress,
+                  `Analyzing similarities...`);
+                break;
+              case 'reporting':
+                updateStageProgress(4, job.stage_progress,
+                  `Generating final report...`);
+                break;
+            }
+
+            if (job.status === 'completed') {
+              completeStage(3);
+              completeStage(4);
+              setIsComplete(true);
+              setLoading(false);
+              toast({
+                title: 'Analysis Complete',
+                description: 'Your repository analysis is ready to view.',
+              });
+            } else if (job.status === 'failed') {
+              setStages(prevStages => prevStages.map(stage => ({
+                ...stage,
+                status: stage.status === 'in-progress' ? 'error' : stage.status,
+                statusText: job.error
+              })));
+              setIsComplete(true);
+              setLoading(false);
+              toast({
+                title: 'Analysis Failed',
+                description: job.error || 'An error occurred during analysis',
+                variant: 'destructive'
+              });
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    setupSubscription();
 
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
+      if (channel) {
+        console.log('Cleaning up Supabase channel...');
+        channel.unsubscribe();
       }
       if (stage2StartTimeout) {
         clearTimeout(stage2StartTimeout);
@@ -420,14 +532,7 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         clearTimeout(totalAnalysisTimeout);
       }
     };
-  }, [checkJobStatus, stage2StartTimeout, totalAnalysisTimeout]);
-
-  // Clear polling when job completes
-  useEffect(() => {
-    if (isComplete && pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-    }
-  }, [isComplete]);
+  }, [owner, name]);
 
   // Handle initial mount
   useEffect(() => {
@@ -557,19 +662,11 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
       }
 
       // Start new job
-      setStages(prevStages => prevStages.map(stage => ({
-        ...stage,
-        status: 'not-started',
-        progress: 0,
-        statusText: undefined
-      })));
-
-      // Start or resume job
       const { data: job, error: jobError } = await supabase
         .from('analysis_jobs')
         .upsert({
           repository_id: repositoryId,
-          status: 'processing',
+          status: 'fetching',
           processing_stage: 'fetching',
           processing_stage_number: 1,
           stage_progress: 0,
@@ -595,7 +692,10 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
       // Update job with total count
       await supabase
         .from('analysis_jobs')
-        .update({ total_issues_count: totalCount })
+        .update({
+          total_issues_count: totalCount,
+          last_processed_at: new Date().toISOString()
+        })
         .eq('id', job.id);
 
       // Fetch and process issues in batches
@@ -640,7 +740,8 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
           issue_title: issue.title,
           issue_body: issue.body,
           status: 'queued',
-          embedding_status: 'pending'
+          embedding_status: 'pending',
+          retry_count: 0
         }));
 
         const { error: batchError } = await supabase
@@ -652,13 +753,14 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         processedCount += batch.length;
         page++;
 
-        // Update job progress
+        // Update job progress with all relevant fields
         await supabase
           .from('analysis_jobs')
           .update({
             processed_issues_count: processedCount,
             last_processed_issue_number: batch[batch.length - 1].number,
-            stage_progress: stageProgress
+            stage_progress: stageProgress,
+            last_processed_at: new Date().toISOString()
           })
           .eq('id', job.id);
       }
@@ -666,16 +768,21 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
       // Complete Stage 1
       completeStage(1);
 
-      // Stage 2: Processing (Embeddings)
-      updateStageProgress(2, 0, 'Starting embedding generation...');
+      // Complete Stage 1 and move to Stage 2
       await supabase
         .from('analysis_jobs')
         .update({
+          status: 'processing',
           processing_stage: 'embedding',
           processing_stage_number: 2,
-          stage_progress: 0
+          stage_progress: 0,
+          last_processed_at: new Date().toISOString(),
+          embedded_issues_count: 0 // Reset for Stage 2
         })
         .eq('id', job.id);
+
+      // Stage 2: Processing (Embeddings)
+      updateStageProgress(2, 0, 'Starting embedding generation...');
 
       // Processing will continue in the edge function
       // We just need to monitor progress via the subscription
@@ -700,135 +807,13 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
     }
   };
 
-  // Update monitoring to handle new progress tracking
-  useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel>;
-
-    const setupSubscription = async () => {
-      const { data: repository } = await supabase
-        .from('repositories')
-        .select('id')
-        .eq('owner', owner)
-        .eq('name', name)
-        .single();
-
-      if (!repository) return;
-
-      channel = supabase
-        .channel('analysis_progress')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'analysis_jobs',
-            filter: `repository_id=eq.${repository.id}`
-          },
-          async (payload) => {
-            const job = payload.new;
-
-            // Check if analysis has exceeded timeout
-            if (job.created_at && job.status === 'processing') {
-              const startedAt = new Date(job.created_at).getTime();
-              const now = new Date().getTime();
-              if (now - startedAt >= ANALYSIS_TIMEOUT_MS) {
-                // Auto-cancel the analysis
-                await supabase
-                  .from('analysis_jobs')
-                  .update({
-                    status: 'cancelled',
-                    error: 'Analysis exceeded maximum time limit of 15 minutes'
-                  })
-                  .eq('id', job.id);
-
-                setStages(prevStages => prevStages.map(stage => ({
-                  ...stage,
-                  status: stage.status === 'in-progress' ? 'error' : stage.status,
-                  statusText: stage.status === 'in-progress' ? 'Analysis exceeded time limit' : stage.statusText
-                })));
-                setIsComplete(true);
-                setLoading(false);
-                setCanResume(true);
-                return;
-              }
-            }
-
-            // Rest of the existing switch case for processing_stage
-            switch (job.processing_stage) {
-              case 'fetching':
-                updateStageProgress(1, job.stage_progress,
-                  `Fetched ${job.processed_issues_count} of ${job.total_issues_count} issues...`);
-                break;
-              case 'embedding':
-                updateStageProgress(2, job.stage_progress,
-                  `Processed ${job.embedded_issues_count} of ${job.total_issues_count} issues...`);
-                break;
-              case 'analyzing':
-                updateStageProgress(3, job.stage_progress,
-                  `Analyzing similarities...`);
-                break;
-              case 'reporting':
-                updateStageProgress(4, job.stage_progress,
-                  `Generating final report...`);
-                break;
-            }
-
-            if (job.status === 'completed') {
-              completeStage(3);
-              completeStage(4);
-              setIsComplete(true);
-              setLoading(false);
-              toast({
-                title: 'Analysis Complete',
-                description: 'Your repository analysis is ready to view.',
-              });
-            } else if (job.status === 'failed') {
-              setStages(prevStages => prevStages.map(stage => ({
-                ...stage,
-                status: stage.status === 'in-progress' ? 'error' : stage.status,
-                statusText: job.error
-              })));
-              setIsComplete(true);
-              setLoading(false);
-              toast({
-                title: 'Analysis Failed',
-                description: job.error || 'An error occurred during analysis',
-                variant: 'destructive'
-              });
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    setupSubscription();
-
-    return () => {
-      if (channel) {
-        console.log('Cleaning up Supabase channel...');
-        channel.unsubscribe();
-      }
-      // Clear all intervals and timeouts
-      if (pollIntervalRef.current) {
-        console.log('Cleaning up polling interval...');
-        clearInterval(pollIntervalRef.current);
-      }
-      if (stage2StartTimeout) {
-        clearTimeout(stage2StartTimeout);
-      }
-      if (totalAnalysisTimeout) {
-        clearTimeout(totalAnalysisTimeout);
-      }
-    };
-  }, [owner, name]);
-
   const stopAnalysis = async () => {
     try {
       const { data: activeJob } = await supabase
         .from('analysis_jobs')
         .select('*')
         .eq('repository_id', repositoryId)
-        .eq('status', 'processing')
+        .in('status', ['fetching', 'processing', 'analyzing'])
         .single();
 
       if (activeJob) {
@@ -836,7 +821,9 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
           .from('analysis_jobs')
           .update({
             status: 'cancelled',
-            error: 'Analysis cancelled by user'
+            error: 'Analysis cancelled by user',
+            last_processed_at: new Date().toISOString(),
+            completed_at: new Date().toISOString() // Set completed_at even for cancelled jobs
           })
           .eq('id', activeJob.id);
 

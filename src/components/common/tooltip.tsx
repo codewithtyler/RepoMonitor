@@ -2,6 +2,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { theme } from '@/config/theme';
 import { useState, useRef, useEffect } from 'react';
 
+// Note: This project uses plain React + TailwindCSS.
+// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
+// All components are built from scratch using TailwindCSS for styling.
+
 interface TooltipProps {
   content: string;
   children: React.ReactNode;
@@ -68,9 +72,9 @@ export function Tooltip({ content, children, delay = 300 }: TooltipProps) {
             }}
           >
             {content}
-            <div 
+            <div
               className="absolute left-1/2 bottom-0 w-2 h-2 -mb-1 transform -translate-x-1/2 rotate-45"
-              style={{ 
+              style={{
                 backgroundColor: theme.colors.background.tooltip,
                 borderRight: `1px solid ${theme.colors.border.primary}`,
                 borderBottom: `1px solid ${theme.colors.border.primary}`
@@ -81,4 +85,4 @@ export function Tooltip({ content, children, delay = 300 }: TooltipProps) {
       </AnimatePresence>
     </div>
   );
-} 
+}

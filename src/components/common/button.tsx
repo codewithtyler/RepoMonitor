@@ -1,6 +1,10 @@
 import { ButtonHTMLAttributes, forwardRef } from 'react';
 import { theme } from '@/config/theme';
 
+// Note: This project uses plain React + TailwindCSS.
+// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
+// All components are built from scratch using TailwindCSS for styling.
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary';
 }
@@ -50,4 +54,4 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       </button>
     );
   }
-); 
+);

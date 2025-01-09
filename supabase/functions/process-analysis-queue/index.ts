@@ -24,6 +24,53 @@ const supabase = createClient(
   }
 );
 
+// Function to get GitHub token for a user
+async function getGitHubToken(userId: string): Promise<string> {
+  // Get user's token from database
+  const { data: tokenData, error } = await supabase
+    .from('github_tokens')
+    .select('token, expires_at')
+    .eq('user_id', userId)
+    .single();
+
+  if (error || !tokenData?.token) {
+    throw new Error('Failed to get GitHub token');
+  }
+
+  // Check if token is expired
+  if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+    throw new Error('GitHub token has expired');
+  }
+
+  // Decrypt token using our database function
+  const { data: decryptedToken, error: decryptError } = await supabase
+    .rpc('decrypt_github_token', { encrypted_token: tokenData.token });
+
+  if (decryptError || !decryptedToken) {
+    throw new Error('Failed to decrypt GitHub token');
+  }
+
+  return decryptedToken;
+}
+
+// Function to fetch issues from GitHub
+async function fetchGitHubIssues(token: string, owner: string, name: string, page: number = 1): Promise<any> {
+  const response = await fetch(`https://api.github.com/repos/${owner}/${name}/issues?state=open&per_page=100&page=${page}`, {
+    headers: {
+      'Authorization': `token ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'RepoMonitor'
+    }
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`GitHub API error: ${error.message}`);
+  }
+
+  return response.json();
+}
+
 // Initialize OpenAI client with error handling
 const openaiApiKey = Deno.env.get('OPENAI_API_KEY') ?? '';
 if (!openaiApiKey) {
@@ -76,6 +123,46 @@ interface ProcessingError {
 
 const MAX_RETRIES = 3;
 
+// Add notification types
+type NotificationType = 'SYSTEM_ERROR' | 'DATA_COLLECTION_COMPLETE' | 'PROCESSING_COMPLETE' |
+  'ANALYSIS_COMPLETE' | 'REPORT_COMPLETE' | 'PROCESSING_ERROR' | 'ANALYSIS_ERROR';
+
+interface NotificationData {
+  title: string;
+  message: string;
+  type: NotificationType;
+  metadata?: Record<string, any>;
+}
+
+async function createNotification(supabase: any, userId: string, data: NotificationData) {
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      title: data.title,
+      message: data.message,
+      type: data.type,
+      metadata: data.metadata || {}
+    });
+
+  if (error) {
+    console.error('Error creating notification:', error);
+  }
+}
+
+async function createAdminNotification(supabase: any, data: NotificationData) {
+  const { error } = await supabase.rpc('create_admin_notification', {
+    p_title: data.title,
+    p_message: data.message,
+    p_type: data.type,
+    p_metadata: data.metadata || {}
+  });
+
+  if (error) {
+    console.error('Error creating admin notification:', error);
+  }
+}
+
 async function batchUpdateProgress(
   jobId: string,
   progress: number,
@@ -91,393 +178,114 @@ async function batchUpdateProgress(
 
 async function processJob(jobId: string) {
   try {
-    console.log(`[${new Date().toISOString()}] Processing job: ${jobId}`);
-
-    // Get job details
+    // Get job details including user_id and repository info
     const { data: job, error: jobError } = await supabase
       .from('analysis_jobs')
-      .select('*')
+      .select('*, repositories!inner(*)')
       .eq('id', jobId)
       .single();
 
-    if (jobError) {
-      console.error(`[${new Date().toISOString()}] Error fetching job:`, jobError);
-      throw jobError;
+    if (jobError || !job) {
+      throw new Error('Failed to get job details');
     }
 
-    if (!job) {
-      console.error(`[${new Date().toISOString()}] Job not found: ${jobId}`);
-      throw new Error('Job not found');
-    }
+    // Get GitHub token for the user
+    const token = await getGitHubToken(job.user_id);
 
-    console.log(`[${new Date().toISOString()}] Job details:`, {
-      stage: job.processing_stage,
-      stageNumber: job.processing_stage_number,
-      totalIssues: job.total_issues_count,
-      processedIssues: job.processed_issues_count,
-      embeddedIssues: job.embedded_issues_count,
-      stageProgress: job.stage_progress
+    // Get total issue count first
+    const response = await fetch(`https://api.github.com/search/issues?q=repo:${job.repositories.owner}/${job.repositories.name}+is:issue+is:open`, {
+      headers: {
+        'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'RepoMonitor'
+      }
     });
 
-    // Stage 2: Processing (Embeddings)
-    if (job.processing_stage === 'fetching') {
-      console.log(`[${new Date().toISOString()}] Transitioning from Stage 1 to Stage 2`);
-      // Mark Stage 1 as complete before moving to Stage 2
-      const { error: updateError } = await supabase
-        .from('analysis_jobs')
-        .update({
-          processing_stage: 'embedding',
-          processing_stage_number: 2,
-          stage_progress: 0,
-          processed_issues_count: job.total_issues_count, // Mark Stage 1 issues as processed
-          embedded_issues_count: 0 // Reset embedding progress for Stage 2
-        })
-        .eq('id', jobId);
-
-      if (updateError) {
-        console.error(`[${new Date().toISOString()}] Error updating job stage:`, updateError);
-        throw updateError;
-      }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`GitHub API error: ${error.message}`);
     }
 
-    // Get unprocessed items count for this stage
-    const { count: pendingCount, error: pendingError } = await supabase
-      .from('analysis_job_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('job_id', jobId)
-      .eq('embedding_status', 'pending');
+    const searchData = await response.json();
+    const totalIssues = searchData.total_count;
 
-    if (pendingError) {
-      console.error(`[${new Date().toISOString()}] Error getting pending count:`, pendingError);
-      throw pendingError;
-    }
-
-    const { count: failedCount, error: failedError } = await supabase
-      .from('analysis_job_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('job_id', jobId)
-      .eq('embedding_status', 'error')
-      .lt('retry_count', MAX_RETRIES);
-
-    if (failedError) {
-      console.error(`[${new Date().toISOString()}] Error getting failed count:`, failedError);
-      throw failedError;
-    }
-
-    console.log(`[${new Date().toISOString()}] Item status:`, {
-      pending: pendingCount,
-      failed: failedCount,
-      maxRetries: MAX_RETRIES
-    });
-
-    // Get items in processing state for more than 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { count: stuckCount, error: stuckError } = await supabase
-      .from('analysis_job_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('job_id', jobId)
-      .eq('embedding_status', 'processing')
-      .lt('processed_at', fiveMinutesAgo);
-
-    if (stuckError) {
-      console.error(`[${new Date().toISOString()}] Error getting stuck count:`, stuckError);
-      throw stuckError;
-    }
-
-    if (stuckCount) {
-      console.log(`[${new Date().toISOString()}] Found ${stuckCount} items stuck in processing state`);
-      // Reset stuck items to pending
-      const { error: resetError } = await supabase
-        .from('analysis_job_items')
-        .update({
-          embedding_status: 'pending',
-          processed_at: null
-        })
-        .eq('job_id', jobId)
-        .eq('embedding_status', 'processing')
-        .lt('processed_at', fiveMinutesAgo);
-
-      if (resetError) {
-        console.error(`[${new Date().toISOString()}] Error resetting stuck items:`, resetError);
-        throw resetError;
-      }
-    }
-
-    if (!pendingCount && !failedCount) {
-      // Check if we have any permanent failures
-      const { count: permanentFailures, error: permanentError } = await supabase
-        .from('analysis_job_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('job_id', jobId)
-        .eq('embedding_status', 'error')
-        .gte('retry_count', MAX_RETRIES);
-
-      if (permanentError) {
-        console.error(`[${new Date().toISOString()}] Error getting permanent failures:`, permanentError);
-        throw permanentError;
-      }
-
-      console.log(`[${new Date().toISOString()}] Moving to analysis stage. Permanent failures: ${permanentFailures}`);
-
-      // Move to analysis stage if all embeddings are done (or permanently failed)
-      const { error: updateError } = await supabase
-        .from('analysis_jobs')
-        .update({
-          processing_stage: 'analyzing',
-          processing_stage_number: 3,
-          stage_progress: 0,
-          failed_items_count: permanentFailures || 0
-        })
-        .eq('id', jobId);
-
-      if (updateError) {
-        console.error(`[${new Date().toISOString()}] Error updating job stage:`, updateError);
-        throw updateError;
-      }
-    } else {
-      // Process embeddings in batches
-      let processedCount = job.embedded_issues_count || 0;
-
-      // Get total items to process for accurate progress
-      const { count: totalItems, error: totalError } = await supabase
-        .from('analysis_job_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('job_id', jobId);
-
-      if (totalError) {
-        console.error(`[${new Date().toISOString()}] Error getting total items:`, totalError);
-        throw totalError;
-      }
-
-      if (!totalItems) {
-        console.log(`[${new Date().toISOString()}] No items to process`);
-        return;
-      }
-
-      console.log(`[${new Date().toISOString()}] Processing batch. Total items: ${totalItems}, Processed: ${processedCount}`);
-
-      // First try to get failed items that can be retried
-      const { data: retryItems, error: retryError } = await supabase
-        .from('analysis_job_items')
-        .select('id, issue_title, issue_body, retry_count')
-        .eq('job_id', jobId)
-        .eq('embedding_status', 'error')
-        .lt('retry_count', MAX_RETRIES)
-        .order('issue_number')
-        .limit(BATCH_SIZE);
-
-      if (retryError) {
-        console.error(`[${new Date().toISOString()}] Error getting retry items:`, retryError);
-        throw retryError;
-      }
-
-      // If no retry items, get pending items
-      const { data: pendingItems, error: pendingItemsError } = !retryItems?.length ? await supabase
-        .from('analysis_job_items')
-        .select('id, issue_title, issue_body')
-        .eq('job_id', jobId)
-        .eq('embedding_status', 'pending')
-        .order('issue_number')
-        .limit(BATCH_SIZE) : { data: null, error: null };
-
-      if (pendingItemsError) {
-        console.error(`[${new Date().toISOString()}] Error getting pending items:`, pendingItemsError);
-        throw pendingItemsError;
-      }
-
-      const itemsToProcess = retryItems || pendingItems;
-      if (!itemsToProcess?.length) {
-        console.log(`[${new Date().toISOString()}] No items to process in this batch`);
-        return;
-      }
-
-      console.log(`[${new Date().toISOString()}] Processing ${itemsToProcess.length} items`);
-
-      // Mark batch as processing
-      const { error: markError } = await supabase
-        .from('analysis_job_items')
-        .update({ embedding_status: 'processing' })
-        .in('id', itemsToProcess.map(item => item.id));
-
-      if (markError) {
-        console.error(`[${new Date().toISOString()}] Error marking items as processing:`, markError);
-        throw markError;
-      }
-
-      try {
-        // Generate embeddings for the batch
-        const texts = itemsToProcess.map(item =>
-          `${item.issue_title}\n\n${item.issue_body}`
-        );
-
-        console.log(`[${new Date().toISOString()}] Generating embeddings for ${texts.length} items`);
-
-        const response = await openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: texts,
-          dimensions: 1536,
-        });
-
-        // Prepare updates, handling any individual embedding errors
-        const updates = itemsToProcess.map((item, index) => {
-          const embedding = response.data[index]?.embedding;
-          if (!embedding) {
-            console.log(`[${new Date().toISOString()}] Failed to generate embedding for item ${item.id}`);
-            return {
-              id: item.id,
-              embedding_status: 'error',
-              error_message: 'Failed to generate embedding',
-              retry_count: (item.retry_count || 0) + (retryItems ? 1 : 0)
-            };
-          }
-          return {
-            id: item.id,
-            embedding: embedding,
-            embedding_status: 'completed',
-            processed_at: new Date().toISOString(),
-            retry_count: (item.retry_count || 0) + (retryItems ? 1 : 0)
-          };
-        });
-
-        // Update all items in batch
-        const { error: updateError } = await supabase
-          .from('analysis_job_items')
-          .upsert(updates);
-
-        if (updateError) {
-          console.error(`[${new Date().toISOString()}] Error updating items:`, updateError);
-          throw updateError;
-        }
-
-        // Count successful embeddings
-        const successCount = updates.filter(u => u.embedding_status === 'completed').length;
-        processedCount += successCount;
-
-        console.log(`[${new Date().toISOString()}] Successfully processed ${successCount} items`);
-
-        // Calculate progress based on total items in job_items table
-        const progress = Math.min((processedCount / totalItems) * 100, 100);
-        const { error: progressError } = await supabase
-          .from('analysis_jobs')
-          .update({
-            embedded_issues_count: processedCount,
-            stage_progress: progress
-          })
-          .eq('id', jobId);
-
-        if (progressError) {
-          console.error(`[${new Date().toISOString()}] Error updating progress:`, progressError);
-          throw progressError;
-        }
-
-        console.log(`[${new Date().toISOString()}] Updated progress: ${progress}%`);
-
-      } catch (error) {
-        console.error(`[${new Date().toISOString()}] Error processing batch:`, error);
-
-        // Mark all items in batch as failed but continue processing
-        for (const item of itemsToProcess) {
-          const { error: failureError } = await supabase
-            .from('analysis_job_items')
-            .update({
-              embedding_status: 'error',
-              error_message: error instanceof Error ? error.message : 'Unknown error',
-              retry_count: (item.retry_count || 0) + 1,
-              last_retry_at: new Date().toISOString()
-            })
-            .eq('id', item.id);
-
-          if (failureError) {
-            console.error(`[${new Date().toISOString()}] Error marking item as failed:`, failureError);
-          }
-        }
-      }
-
-      // Add delay between batches
-      await new Promise(resolve => setTimeout(resolve, MIN_BATCH_INTERVAL));
-    }
-
-    // Stage 3: Analysis
-    if (job.processing_stage === 'analyzing') {
-      console.log(`[${new Date().toISOString()}] Starting analysis stage`);
-
-      // Only analyze items that were successfully embedded
-      const { error: analysisError } = await supabase.rpc('find_similar_issues', {
-        p_job_id: jobId,
-        p_similarity_threshold: 0.9
-      });
-
-      if (analysisError) {
-        console.error(`[${new Date().toISOString()}] Error analyzing issues:`, analysisError);
-        throw analysisError;
-      }
-
-      console.log(`[${new Date().toISOString()}] Moving to reporting stage`);
-
-      // Move to reporting stage
-      const { error: updateError } = await supabase
-        .from('analysis_jobs')
-        .update({
-          processing_stage: 'reporting',
-          processing_stage_number: 4,
-          stage_progress: 0
-        })
-        .eq('id', jobId);
-
-      if (updateError) {
-        console.error(`[${new Date().toISOString()}] Error updating job stage:`, updateError);
-        throw updateError;
-      }
-    }
-
-    // Stage 4: Reporting
-    if (job.processing_stage === 'reporting') {
-      console.log(`[${new Date().toISOString()}] Completing job`);
-
-      // Complete the job
-      const { error: completeError } = await supabase
-        .from('analysis_jobs')
-        .update({
-          status: 'completed',
-          stage_progress: 100,
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', jobId);
-
-      if (completeError) {
-        console.error(`[${new Date().toISOString()}] Error completing job:`, completeError);
-        throw completeError;
-      }
-
-      console.log(`[${new Date().toISOString()}] Job completed successfully`);
-    }
-
-  } catch (error) {
-    console.error(`[${new Date().toISOString()}] Error processing job:`, error);
-
-    // Update job with error but don't mark as failed unless it's a critical error
-    const { error: updateError } = await supabase
+    // Update job with total count
+    await supabase
       .from('analysis_jobs')
       .update({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        // Only mark as failed if it's not a recoverable error
-        ...(error instanceof Error && error.message.includes('CRITICAL') ? {
-          status: 'failed',
-          completed_at: new Date().toISOString()
-        } : {})
+        total_issues_count: totalIssues,
+        last_processed_at: new Date().toISOString()
       })
       .eq('id', jobId);
 
-    if (updateError) {
-      console.error(`[${new Date().toISOString()}] Error updating job with error:`, updateError);
+    // Fetch issues in batches
+    let page = 1;
+    let processedCount = 0;
+
+    while (processedCount < totalIssues) {
+      const issues = await fetchGitHubIssues(token, job.repositories.owner, job.repositories.name, page);
+
+      // Process each issue in the batch
+      for (const issue of issues) {
+        const { error: insertError } = await supabase
+          .from('analysis_job_items')
+          .upsert({
+            job_id: jobId,
+            issue_number: issue.number,
+            issue_title: issue.title,
+            issue_body: issue.body || '',
+            embedding_status: 'pending'
+          });
+
+        if (insertError) {
+          console.error(`Error inserting issue ${issue.number}:`, insertError);
+          continue;
+        }
+
+        processedCount++;
+      }
+
+      // Update job progress
+      const progress = Math.min((processedCount / totalIssues) * 100, 100);
+      await batchUpdateProgress(jobId, progress, 'fetching_issues');
+
+      page++;
     }
+
+    // Move to embedding generation stage
+    await supabase
+      .from('analysis_jobs')
+      .update({
+        status: 'processing',
+        processing_stage: 'generating_embeddings',
+        processing_stage_number: 2,
+        stage_progress: 0,
+        last_processed_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+
+    // Send notification for data collection complete
+    await createNotification(supabase, job.user_id, {
+      title: 'Data Collection Complete',
+      message: `Successfully collected ${totalIssues} issues from ${job.repositories.owner}/${job.repositories.name}`,
+      type: 'DATA_COLLECTION_COMPLETE',
+      metadata: {
+        jobId: jobId,
+        repository: `${job.repositories.owner}/${job.repositories.name}`,
+        issueCount: totalIssues
+      }
+    });
+
+  } catch (error) {
+    console.error(`Error processing job:`, error);
+    throw error;
   }
 }
 
 async function checkQueueState(jobId: string) {
   console.log(`[${new Date().toISOString()}] Checking queue state for job: ${jobId}`);
 
-  // Get counts for each status
+  // Get counts for each embedding status
   const statuses = ['pending', 'processing', 'completed', 'error'];
   for (const status of statuses) {
     const { count, error } = await supabase
@@ -489,11 +297,11 @@ async function checkQueueState(jobId: string) {
     if (error) {
       console.error(`[${new Date().toISOString()}] Error getting ${status} count:`, error);
     } else {
-      console.log(`[${new Date().toISOString()}] ${status}: ${count}`);
+      console.log(`[${new Date().toISOString()}] Embedding ${status}: ${count}`);
     }
   }
 
-  // Get items that might be stuck
+  // Get items that might be stuck in processing
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { data: stuckItems, error: stuckError } = await supabase
     .from('analysis_job_items')
@@ -538,6 +346,32 @@ async function checkQueueState(jobId: string) {
   }
 }
 
+// Update the function that inserts duplicate issues
+async function insertDuplicateIssues(jobId: string, duplicates: Array<{ issue_number: number, duplicate_issue_number: number, confidence: number }>) {
+  const { data: job, error: jobError } = await supabase
+    .from('analysis_jobs')
+    .select('repository_id')
+    .eq('id', jobId)
+    .single();
+
+  if (jobError) throw jobError;
+
+  const duplicateRecords = duplicates.map(d => ({
+    job_id: jobId,
+    repository_id: job.repository_id, // Add repository_id
+    issue_number: d.issue_number,
+    duplicate_issue_number: d.duplicate_issue_number,
+    confidence: d.confidence,
+    created_at: new Date().toISOString()
+  }));
+
+  const { error } = await supabase
+    .from('duplicate_issues')
+    .upsert(duplicateRecords);
+
+  if (error) throw error;
+}
+
 // HTTP endpoint for processing jobs
 serve(async (req) => {
   try {
@@ -545,6 +379,23 @@ serve(async (req) => {
     if (!jobId) {
       throw new Error('Job ID is required');
     }
+
+    // Get job details including user_id
+    const { data: job, error: jobError } = await supabase
+      .from('analysis_jobs')
+      .select('*, repositories!inner(*)')
+      .eq('id', jobId)
+      .single();
+
+    if (jobError || !job) {
+      throw new Error('Failed to get job details');
+    }
+
+    // Get GitHub token for the user
+    const token = await getGitHubToken(job.user_id);
+
+    // Now we can use this token for GitHub API calls
+    // Rest of the processing logic...
 
     // Check queue state before processing
     await checkQueueState(jobId);

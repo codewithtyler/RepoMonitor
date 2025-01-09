@@ -90,7 +90,7 @@ export function Home() {
       <div className="w-full px-4 py-16 text-center" style={{ backgroundColor: theme.colors.background.secondary }}>
         <h2 className="mb-4 text-3xl font-bold">Support RepoMonitor</h2>
         <p className="mx-auto mb-8 max-w-2xl" style={{ color: theme.colors.text.secondary }}>
-          RepoMonitor is an open-source project that helps developers monitor and manage their repositories. 
+          RepoMonitor is an open-source project that helps developers monitor and manage their repositories.
           Your support helps us continue development and keep the service running.
         </p>
         <a

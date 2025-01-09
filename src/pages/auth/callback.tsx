@@ -1,54 +1,127 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { redirect } from 'react-router-dom';
 import { supabase } from '../../lib/auth/supabase-client';
 import { GitHubTokenManager } from '../../lib/auth/github-token-manager';
-import { theme } from '@/config/theme';
+import { useUser } from '../../lib/auth/hooks';
+import { Loader2 } from 'lucide-react';
+
+export async function loader() {
+  console.log('[Auth Loader] Starting loader function');
+  const { data: { session }, error } = await supabase.auth.getSession();
+
+  if (error) {
+    console.error('[Auth Loader] Error getting session:', error);
+  }
+
+  console.log('[Auth Loader] Session state:', {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userId: session?.user?.id,
+    hasProviderToken: !!session?.provider_token
+  });
+
+  if (!session?.user) {
+    console.log('[Auth Loader] No session found, redirecting to home');
+    return redirect('/');
+  }
+  return null;
+}
 
 export function AuthCallback() {
-  const navigate = useNavigate();
+  const { user, loading } = useUser();
+  const [status, setStatus] = useState<string>('Initializing...');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('[Auth] Starting callback handler');
+        setStatus('Starting authentication...');
 
-        if (sessionError) throw sessionError;
-        if (!session) throw new Error('No session found');
-
-        // Get the GitHub token from the session
-        const githubToken = session.provider_token;
-        const userId = session.user.id;
-
-        if (!githubToken) {
-          throw new Error('No GitHub token found in session');
+        // Wait for user state to be loaded
+        if (loading) {
+          console.log('[Auth] Waiting for user state...');
+          setStatus('Loading user state...');
+          return;
         }
 
-        // Use the token manager to handle the OAuth token
-        await GitHubTokenManager.handleOAuthToken(githubToken, userId);
+        if (!user) {
+          console.log('[Auth] No user found');
+          setStatus('No user found, redirecting...');
+          setError('Authentication failed - no user found');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          window.location.href = '/';
+          return;
+        }
 
-        // Navigate to the dashboard on success
-        navigate('/dashboard');
+        console.log('[Auth] User found:', {
+          id: user.id,
+          email: user.email,
+          provider: user.app_metadata?.provider
+        });
+        setStatus('User authenticated, getting session...');
+
+        // Get the session to access provider token
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.error('[Auth] Session error:', sessionError);
+          setError(`Session error: ${sessionError.message}`);
+          throw sessionError;
+        }
+
+        if (!session?.provider_token) {
+          console.error('[Auth] No provider token in session');
+          setStatus('Missing provider token...');
+          setError('No GitHub access token found');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          window.location.href = '/';
+          return;
+        }
+
+        // Log token format (first 4 characters only)
+        console.log('[Auth] Token format check:', {
+          prefix: session.provider_token.substring(0, 4),
+          length: session.provider_token.length
+        });
+        setStatus('Storing GitHub token...');
+
+        // Store the GitHub token
+        console.log('[Auth] Attempting to store GitHub token');
+        await GitHubTokenManager.handleOAuthToken(session.provider_token, user.id);
+        console.log('[Auth] Token stored successfully');
+
+        setStatus('Success! Redirecting to dashboard...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        window.location.href = '/dashboard';
       } catch (err) {
-        console.error('Error in callback:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        console.error('[Auth] Error in callback:', err);
+        setStatus('Error occurred during authentication');
+        setError(err instanceof Error ? err.message : 'Unknown error occurred');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        window.location.href = '/';
       }
     };
 
-    handleCallback();
-  }, [navigate]);
-
-  if (error) {
-    return (
-      <div style={{ color: theme.colors.error.primary, padding: '20px' }}>
-        Error: {error}
-      </div>
-    );
-  }
+    if (!loading) {
+      handleCallback();
+    }
+  }, [user, loading]);
 
   return (
-    <div style={{ padding: '20px' }}>
-      Logging you in...
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            {status}
+          </h2>
+          {error && (
+            <div className="text-sm text-red-500 text-center mt-2">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
