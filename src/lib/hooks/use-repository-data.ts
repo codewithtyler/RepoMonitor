@@ -94,12 +94,84 @@ export function useRepositoriesData() {
                 openIssuesCount: githubData.open_issues_count,
                 lastAnalysisTimestamp: repo.last_analysis_timestamp,
                 isAnalyzing: repo.is_analyzing,
-                createdAt: new Date().toISOString(), // TODO: Get from GitHub
-                updatedAt: new Date().toISOString(), // TODO: Get from GitHub
+                createdAt: githubData.created_at,
+                updatedAt: githubData.updated_at,
                 url: `https://github.com/${repo.owner}/${repo.name}`,
+                visibility: githubData.visibility as 'public' | 'private',
+                defaultBranch: githubData.default_branch,
+                permissions: {
+                  admin: githubData.permissions?.admin ?? false,
+                  push: githubData.permissions?.push ?? false,
+                  pull: githubData.permissions?.pull ?? false,
+                },
+                topics: githubData.topics ?? [],
+                language: githubData.language,
+                size: githubData.size,
+                hasIssues: githubData.has_issues,
+                isArchived: githubData.archived,
+                isDisabled: githubData.disabled,
+                license: githubData.license ? {
+                  key: githubData.license.key,
+                  name: githubData.license.name,
+                  url: githubData.license.url,
+                } : null,
               };
             } catch (error) {
               console.error(`[useRepositoriesData] Error fetching GitHub data for ${repo.owner}/${repo.name}:`, error);
+
+              // Implement retry logic for transient errors
+              if (error instanceof Error &&
+                (error.message.includes('rate limit') ||
+                  error.message.includes('network') ||
+                  error.message.includes('timeout'))) {
+                const retryDelay = 1000; // 1 second
+                console.log(`[useRepositoriesData] Retrying fetch for ${repo.owner}/${repo.name} in ${retryDelay}ms`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+                try {
+                  const retryData = await withGitHub(async (client) => {
+                    const data = await client.getRepository(repo.owner, repo.name);
+                    if (!data) throw new Error('No GitHub data returned on retry');
+                    return data;
+                  });
+
+                  return {
+                    id: repo.id,
+                    owner: repo.owner,
+                    name: repo.name,
+                    description: retryData.description,
+                    stargazersCount: retryData.stargazers_count,
+                    forksCount: retryData.forks_count,
+                    openIssuesCount: retryData.open_issues_count,
+                    lastAnalysisTimestamp: repo.last_analysis_timestamp,
+                    isAnalyzing: repo.is_analyzing,
+                    createdAt: retryData.created_at,
+                    updatedAt: retryData.updated_at,
+                    url: `https://github.com/${repo.owner}/${repo.name}`,
+                    visibility: retryData.visibility as 'public' | 'private',
+                    defaultBranch: retryData.default_branch,
+                    permissions: {
+                      admin: retryData.permissions?.admin ?? false,
+                      push: retryData.permissions?.push ?? false,
+                      pull: retryData.permissions?.pull ?? false,
+                    },
+                    topics: retryData.topics ?? [],
+                    language: retryData.language,
+                    size: retryData.size,
+                    hasIssues: retryData.has_issues,
+                    isArchived: retryData.archived,
+                    isDisabled: retryData.disabled,
+                    license: retryData.license ? {
+                      key: retryData.license.key,
+                      name: retryData.license.name,
+                      url: retryData.license.url,
+                    } : null,
+                  };
+                } catch (retryError) {
+                  console.error(`[useRepositoriesData] Retry failed for ${repo.owner}/${repo.name}:`, retryError);
+                }
+              }
+
               toast({
                 title: 'Error',
                 description: `Failed to fetch GitHub data for ${repo.owner}/${repo.name}`,

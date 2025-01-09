@@ -14,57 +14,128 @@ interface RepositoryState {
   repositories: Repository[];
   loading: boolean;
   error: Error | null;
+  lastUpdated: number | null;
 }
+
+type StateSubscriber = (state: RepositoryState) => void;
 
 let state: RepositoryState = {
   repositories: [],
   loading: true,
-  error: null
+  error: null,
+  lastUpdated: null
 };
 
-const subscribers = new Set<(state: RepositoryState) => void>();
+const subscribers = new Set<StateSubscriber>();
+let cleanupTimeout: number | null = null;
+
+// Helper to check if state has changed
+function hasStateChanged(oldState: RepositoryState, newState: RepositoryState): boolean {
+  return (
+    oldState.loading !== newState.loading ||
+    oldState.error !== newState.error ||
+    oldState.lastUpdated !== newState.lastUpdated ||
+    oldState.repositories.length !== newState.repositories.length ||
+    JSON.stringify(oldState.repositories) !== JSON.stringify(newState.repositories)
+  );
+}
 
 function notifySubscribers() {
+  if (typeof window === 'undefined') return; // Don't notify during SSR
   subscribers.forEach(callback => callback(state));
 }
 
-export function getRepositoryState(): RepositoryState {
-  return state;
+// Cleanup old data after 5 minutes of inactivity
+function scheduleCleanup() {
+  if (cleanupTimeout) {
+    window.clearTimeout(cleanupTimeout);
+  }
+
+  cleanupTimeout = window.setTimeout(() => {
+    if (subscribers.size === 0) {
+      console.log('[RepositoryState] Cleaning up stale data');
+      state = {
+        repositories: [],
+        loading: true,
+        error: null,
+        lastUpdated: null
+      };
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+}
+
+export function getRepositoryState(): Readonly<RepositoryState> {
+  return Object.freeze({ ...state });
 }
 
 export function updateRepositories(repositories: Repository[]) {
   console.log('[RepositoryState] Updating repositories:', repositories.length);
-  state = {
+  const newState = {
     ...state,
     repositories,
     loading: false,
-    error: null
+    error: null,
+    lastUpdated: Date.now()
   };
-  notifySubscribers();
+
+  if (hasStateChanged(state, newState)) {
+    state = newState;
+    notifySubscribers();
+    scheduleCleanup();
+  }
 }
 
 export function setLoading(loading: boolean) {
-  state = {
+  const newState = {
     ...state,
     loading
   };
-  notifySubscribers();
+
+  if (hasStateChanged(state, newState)) {
+    state = newState;
+    notifySubscribers();
+    scheduleCleanup();
+  }
 }
 
 export function setError(error: Error) {
-  state = {
+  const newState = {
     ...state,
     error,
-    loading: false
+    loading: false,
+    lastUpdated: Date.now()
   };
-  notifySubscribers();
+
+  if (hasStateChanged(state, newState)) {
+    state = newState;
+    notifySubscribers();
+    scheduleCleanup();
+  }
 }
 
-export function subscribeToRepositories(callback: (state: RepositoryState) => void): () => void {
+export function subscribeToRepositories(callback: StateSubscriber): () => void {
   subscribers.add(callback);
   callback(state); // Initial state
 
+  // Return cleanup function
   return () => {
     subscribers.delete(callback);
+    scheduleCleanup();
   };
+}
+
+// Expose a method to force cleanup (useful for testing)
+export function __forceCleanup() {
+  if (process.env.NODE_ENV === 'development') {
+    if (cleanupTimeout) {
+      window.clearTimeout(cleanupTimeout);
+    }
+    state = {
+      repositories: [],
+      loading: true,
+      error: null,
+      lastUpdated: null
+    };
+    notifySubscribers();
+  }
 }
