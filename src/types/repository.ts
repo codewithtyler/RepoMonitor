@@ -1,9 +1,11 @@
 export interface Repository {
     id: string;
+    owner: string;
     name: string;
-    fullName: string;
     description: string | null;
     url: string;
+    stargazersCount: number;
+    forksCount: number;
     openIssuesCount: number;
     lastAnalysisTimestamp: string | null;
     isAnalyzing: boolean;

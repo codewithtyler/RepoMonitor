@@ -1,21 +1,12 @@
 import { GitFork, GitPullRequest, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Repository } from '../../types/repository';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
 // All components are built from scratch using TailwindCSS for styling.
-
-interface Repository {
-  id: string;
-  owner: string;
-  name: string;
-  description?: string;
-  stargazersCount?: number;
-  forksCount?: number;
-  openIssuesCount?: number;
-  lastAnalysisTimestamp?: string;
-  isAnalyzing?: boolean;
-}
+// New reusable components should be added to src/components/common/
+// Do not create a components/ui folder - use common instead.
 
 interface RecentRepositoriesCardProps {
   repositories: Repository[];
@@ -50,58 +41,38 @@ export function RecentRepositoriesCard({ repositories }: RecentRepositoriesCardP
               <div
                 key={repo.id}
                 onClick={() => handleRepoClick(repo.owner, repo.name)}
-                className="flex items-start space-x-4 p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    handleRepoClick(repo.owner, repo.name);
-                  }
-                }}
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium text-blue-600 dark:text-blue-400">
                     {repo.owner}/{repo.name}
-                  </p>
-                  {repo.description && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
-                      {repo.description}
-                    </p>
-                  )}
-                  <div className="flex items-center space-x-4 mt-2">
-                    {repo.stargazersCount !== undefined && (
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <Star className="w-4 h-4 mr-1" />
-                        {repo.stargazersCount.toLocaleString()}
-                      </div>
-                    )}
-                    {repo.forksCount !== undefined && (
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <GitFork className="w-4 h-4 mr-1" />
-                        {repo.forksCount.toLocaleString()}
-                      </div>
-                    )}
-                    {repo.openIssuesCount !== undefined && (
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <GitPullRequest className="w-4 h-4 mr-1" />
-                        {repo.openIssuesCount.toLocaleString()}
-                      </div>
-                    )}
+                  </h3>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center text-gray-500 dark:text-gray-400">
+                      <Star className="w-4 h-4 mr-1" />
+                      <span className="text-xs">{repo.stargazersCount}</span>
+                    </div>
+                    <div className="flex items-center text-gray-500 dark:text-gray-400">
+                      <GitFork className="w-4 h-4 mr-1" />
+                      <span className="text-xs">{repo.forksCount}</span>
+                    </div>
+                    <div className="flex items-center text-gray-500 dark:text-gray-400">
+                      <GitPullRequest className="w-4 h-4 mr-1" />
+                      <span className="text-xs">{repo.openIssuesCount}</span>
+                    </div>
                   </div>
                 </div>
-                {repo.isAnalyzing && (
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                    Analyzing
-                  </span>
+                {repo.description && (
+                  <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                    {repo.description}
+                  </p>
                 )}
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Last analyzed: {repo.lastAnalysisTimestamp ? new Date(repo.lastAnalysisTimestamp).toLocaleDateString() : 'Never'}
+                </div>
               </div>
             );
           })}
-          {sortedRepos.length === 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-              No repositories tracked yet
-            </p>
-          )}
         </div>
       </div>
     </div>
