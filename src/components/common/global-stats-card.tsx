@@ -1,4 +1,6 @@
-import { Repository } from '../../types/repository';
+import { Repository } from '@/types/repository';
+import { GitPullRequest, GitMerge, GitBranch, AlertCircle } from 'lucide-react';
+import { RepoStatsCard } from '@/components/repository/repo-stats-card';
 
 interface GlobalStatsCardProps {
   repositories: Repository[];
@@ -17,23 +19,35 @@ export function GlobalStatsCard({ repositories }: GlobalStatsCardProps) {
   console.log('[GlobalStatsCard] Calculated stats:', stats);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900">Tracked Repositories</h3>
-        <p className="text-3xl font-bold text-blue-600 mt-2">{stats.trackedRepos}</p>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900">Analyzed Repositories</h3>
-        <p className="text-3xl font-bold text-green-600 mt-2">{stats.analyzedRepos}</p>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900">Open Issues</h3>
-        <p className="text-3xl font-bold text-yellow-600 mt-2">{stats.openIssues}</p>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900">Active Automations</h3>
-        <p className="text-3xl font-bold text-purple-600 mt-2">{stats.activeAutomations}</p>
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <RepoStatsCard
+        id="trackedRepos"
+        title="Tracked Repositories"
+        value={stats.trackedRepos.toString()}
+        description="Total repositories being monitored"
+        icon={GitBranch}
+      />
+      <RepoStatsCard
+        id="analyzedRepos"
+        title="Analyzed Repositories"
+        value={stats.analyzedRepos.toString()}
+        description="Repositories with completed analysis"
+        icon={GitMerge}
+      />
+      <RepoStatsCard
+        id="openIssues"
+        title="Open Issues"
+        value={stats.openIssues.toString()}
+        description="Across all repositories"
+        icon={GitPullRequest}
+      />
+      <RepoStatsCard
+        id="activeAutomations"
+        title="Active Automations"
+        value={stats.activeAutomations.toString()}
+        description="Currently running analyses"
+        icon={AlertCircle}
+      />
     </div>
   );
 }

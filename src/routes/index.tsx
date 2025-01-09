@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { DashboardContainer } from '../components/layout/dashboard-container';
 import { Dashboard } from '../pages/Dashboard';
 import { AuthCallback } from '../pages/auth/callback';
 import { Home } from '../pages/Home';
@@ -28,11 +27,7 @@ function ProtectedRoute() {
   }
 
   console.log('[ProtectedRoute] User authenticated, rendering dashboard');
-  return (
-    <DashboardContainer>
-      <Dashboard />
-    </DashboardContainer>
-  );
+  return <Dashboard />;
 }
 
 export function AppRouter() {
