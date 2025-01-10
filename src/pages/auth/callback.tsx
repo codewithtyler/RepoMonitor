@@ -4,6 +4,7 @@ import { supabase } from '../../lib/auth/supabase-client';
 import { GitHubTokenManager } from '../../lib/auth/github-token-manager';
 import { useUser } from '../../lib/auth/hooks';
 import { Loader2 } from 'lucide-react';
+import { theme } from '@/config/theme';
 
 export async function loader() {
   console.log('[Auth Loader] Starting loader function');
@@ -108,15 +109,27 @@ export function AuthCallback() {
   }, [user, loading]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6">
+    <div
+      className="flex flex-col items-center justify-center min-h-screen p-4"
+      style={{ backgroundColor: theme.colors.background.primary }}
+    >
+      <div
+        className="max-w-md w-full rounded-lg border shadow-lg p-6"
+        style={{
+          backgroundColor: theme.colors.background.secondary,
+          borderColor: theme.colors.border.primary
+        }}
+      >
         <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.colors.brand.primary }} />
+          <h2
+            className="text-xl font-semibold"
+            style={{ color: theme.colors.text.primary }}
+          >
             {status}
           </h2>
           {error && (
-            <div className="text-sm text-red-500 text-center mt-2">
+            <div className="text-sm text-center mt-2" style={{ color: theme.colors.text.error }}>
               {error}
             </div>
           )}
