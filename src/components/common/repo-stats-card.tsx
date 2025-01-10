@@ -1,6 +1,5 @@
 import { LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { theme } from '@/config/theme';
 import { StatCard } from './stat-card';
 
 interface RepoStatsCardProps {
@@ -12,15 +11,20 @@ interface RepoStatsCardProps {
   onRefresh?: () => void;
   refreshing?: boolean;
   variant?: 'default' | 'compact';
+  layoutId?: string;
 }
 
 export function RepoStatsCard(props: RepoStatsCardProps) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      layoutId={props.layoutId}
+      transition={{
+        layout: {
+          type: "spring",
+          bounce: 0.2,
+          duration: 2.5
+        }
+      }}
     >
       <StatCard {...props} />
     </motion.div>

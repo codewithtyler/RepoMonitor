@@ -1,12 +1,15 @@
 import { Repository } from '@/types/repository';
 import { GitPullRequest, GitMerge, GitBranch, AlertCircle } from 'lucide-react';
-import { RepoStatsCard } from '@/components/common/repo-stats-card';
+import { motion } from 'framer-motion';
+import { StatCard } from './stat-card';
 
 interface GlobalStatsCardProps {
   repositories: Repository[];
+  variant?: 'default' | 'compact';
+  layoutOrder?: string[];
 }
 
-export function GlobalStatsCard({ repositories }: GlobalStatsCardProps) {
+export function GlobalStatsCard({ repositories, variant = 'default', layoutOrder = ['trackedRepos', 'analyzedRepos', 'openIssues', 'activeAutomations'] }: GlobalStatsCardProps) {
   console.log('[GlobalStatsCard] Rendering with repositories:', repositories.length);
 
   const stats = {
@@ -16,38 +19,59 @@ export function GlobalStatsCard({ repositories }: GlobalStatsCardProps) {
     activeAutomations: repositories.filter(r => r.isAnalyzing).length
   };
 
+  const statsConfig = {
+    trackedRepos: {
+      title: "Tracked Repositories",
+      description: "Total repositories being monitored",
+      icon: GitBranch
+    },
+    analyzedRepos: {
+      title: "Analyzed Repositories",
+      description: "Repositories with completed analysis",
+      icon: GitMerge
+    },
+    openIssues: {
+      title: "Open Issues",
+      description: "Across all repositories",
+      icon: GitPullRequest
+    },
+    activeAutomations: {
+      title: "Active Automations",
+      description: "Currently running analyses",
+      icon: AlertCircle
+    }
+  };
+
   console.log('[GlobalStatsCard] Calculated stats:', stats);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      <RepoStatsCard
-        id="trackedRepos"
-        title="Tracked Repositories"
-        value={stats.trackedRepos.toString()}
-        description="Total repositories being monitored"
-        icon={GitBranch}
-      />
-      <RepoStatsCard
-        id="analyzedRepos"
-        title="Analyzed Repositories"
-        value={stats.analyzedRepos.toString()}
-        description="Repositories with completed analysis"
-        icon={GitMerge}
-      />
-      <RepoStatsCard
-        id="openIssues"
-        title="Open Issues"
-        value={stats.openIssues.toString()}
-        description="Across all repositories"
-        icon={GitPullRequest}
-      />
-      <RepoStatsCard
-        id="activeAutomations"
-        title="Active Automations"
-        value={stats.activeAutomations.toString()}
-        description="Currently running analyses"
-        icon={AlertCircle}
-      />
-    </div>
+    <motion.div
+      className={variant === 'compact' ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-4 gap-4'}
+      layout="position"
+      transition={{
+        layout: {
+          type: "tween",
+          duration: 5.5,
+          ease: "easeInOut",
+          delay: 0.3
+        }
+      }}
+    >
+      {layoutOrder.map((key) => {
+        const config = statsConfig[key as keyof typeof statsConfig];
+        return (
+          <StatCard
+            key={key}
+            id={key}
+            title={config.title}
+            value={stats[key as keyof typeof stats].toString()}
+            description={config.description}
+            icon={config.icon}
+            variant={variant}
+            layoutId={`global-stats-${key}`}
+          />
+        );
+      })}
+    </motion.div>
   );
 }

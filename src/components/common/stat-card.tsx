@@ -27,7 +27,7 @@ export function StatCard({
   layoutId
 }: StatCardProps) {
   const isCompact = variant === 'compact';
-  
+
   return (
     <motion.div
       layoutId={layoutId || `stat-card-${id}`}
@@ -41,7 +41,7 @@ export function StatCard({
         }
       }}
     >
-      <motion.div 
+      <motion.div
         className="flex flex-col h-full"
         layout="position"
         transition={{
@@ -52,16 +52,16 @@ export function StatCard({
           }
         }}
       >
-        <motion.div 
+        <motion.div
           className="flex items-start justify-between"
           layout="position"
         >
           <div>
-            <motion.div 
+            <motion.div
               className="flex items-center gap-2"
               layout="position"
             >
-              <motion.p 
+              <motion.p
                 className="text-sm"
                 layout="position"
                 style={{ color: theme.colors.text.secondary }}
@@ -83,7 +83,7 @@ export function StatCard({
                 </motion.button>
               )}
             </motion.div>
-            <motion.p 
+            <motion.p
               className={`font-semibold mt-1 ${isCompact ? 'text-lg' : 'text-2xl'}`}
               layout="position"
               style={{ color: theme.colors.text.primary }}
@@ -92,13 +92,13 @@ export function StatCard({
             </motion.p>
           </div>
           <motion.div layout="position">
-            <Icon 
-              className={isCompact ? 'h-6 w-6' : 'h-8 w-8'} 
-              style={{ color: theme.colors.text.secondary }} 
+            <Icon
+              className={isCompact ? 'h-6 w-6' : 'h-8 w-8'}
+              style={{ color: theme.colors.text.secondary }}
             />
           </motion.div>
         </motion.div>
-        <motion.p 
+        <motion.p
           className="text-sm mt-auto"
           layout="position"
           style={{ color: theme.colors.text.secondary }}
@@ -108,4 +108,4 @@ export function StatCard({
       </motion.div>
     </motion.div>
   );
-} 
+}
