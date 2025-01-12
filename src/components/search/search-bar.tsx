@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { theme } from '@/config/theme';
-import { useSearch } from '@/lib/contexts/search-context';
+import { useSearch } from '../../lib/contexts/search-context';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { toast } from 'sonner';
@@ -17,7 +17,7 @@ export function SearchBar() {
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const { withGitHub } = useGitHub();
-  const { searchQuery, setSearchQuery, triggerSearch } = useSearch();
+  const { searchQuery, setSearchQuery } = useSearch();
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

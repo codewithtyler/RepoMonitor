@@ -1,36 +1,26 @@
-import React, { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react'
 
 interface SearchContextType {
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  triggerSearch: () => void;
-  setTriggerSearch: (trigger: () => void) => void;
+  searchQuery: string
+  setSearchQuery: (query: string) => void
 }
 
-const SearchContext = createContext<SearchContextType | undefined>(undefined);
+const SearchContext = createContext<SearchContextType | undefined>(undefined)
 
-export function SearchProvider({ children }: { children: React.ReactNode }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [triggerSearch, setTriggerSearch] = useState<() => void>(() => {});
-
-  const value = {
-    searchQuery,
-    setSearchQuery,
-    triggerSearch,
-    setTriggerSearch
-  };
+export function SearchProvider({ children }: { children: ReactNode }) {
+  const [searchQuery, setSearchQuery] = useState('')
 
   return (
-    <SearchContext.Provider value={value}>
+    <SearchContext.Provider value={{ searchQuery, setSearchQuery }}>
       {children}
     </SearchContext.Provider>
-  );
+  )
 }
 
 export function useSearch() {
-  const context = useContext(SearchContext);
+  const context = useContext(SearchContext)
   if (context === undefined) {
-    throw new Error('useSearch must be used within a SearchProvider');
+    throw new Error('useSearch must be used within a SearchProvider')
   }
-  return context;
-} 
+  return context
+}
