@@ -6,6 +6,7 @@ import { getAuthState } from '../auth/global-state';
 import { useEffect, useState } from 'react';
 import { getRepositoryState, subscribeToRepositories, updateRepositories, setLoading, setError } from '../repository/global-state';
 import { Repository } from '../../types/repository';
+import { v5 as uuidv5 } from 'uuid';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -19,18 +20,56 @@ import { Repository } from '../../types/repository';
 
 interface SupabaseRepository {
   id: string;
+  github_id: number;
   owner: string;
   name: string;
-  last_analysis_timestamp: string | null;
-  is_analyzing: boolean;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
 }
 
 interface GitHubRepository {
+  id: number;
+  name: string;
+  owner: {
+    login: string;
+  };
   description: string | null;
   stargazers_count: number;
   forks_count: number;
   open_issues_count: number;
+  created_at: string;
+  updated_at: string;
+  visibility: 'public' | 'private';
+  default_branch: string;
+  permissions?: {
+    admin: boolean;
+    push: boolean;
+    pull: boolean;
+  };
+  topics: string[];
+  language: string | null;
+  size: number;
+  has_issues: boolean;
+  archived: boolean;
+  disabled: boolean;
+  license: {
+    key: string;
+    name: string;
+    url: string;
+  } | null;
 }
+
+// UUID namespace for repository IDs (using a constant UUID for consistency)
+const REPO_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+// Function to generate a deterministic UUID for a repository
+const generateRepoId = (owner: string, name: string): string => {
+  // Combine owner and name to create a unique string
+  const uniqueString = `${owner}/${name}`;
+  // Generate a v5 UUID using the namespace and unique string
+  return uuidv5(uniqueString, REPO_NAMESPACE);
+};
 
 export function useRepositoriesData() {
   console.log('[useRepositoriesData] Hook initializing');
@@ -84,18 +123,21 @@ export function useRepositoriesData() {
                 return data;
               });
 
+              if (!githubData.id) {
+                throw new Error('GitHub repository is missing an ID');
+              }
+
               return {
-                id: repo.id,
+                id: generateRepoId(repo.owner, repo.name),
+                github_id: githubData.id,
                 owner: repo.owner,
                 name: repo.name,
                 description: githubData.description,
                 stargazersCount: githubData.stargazers_count,
                 forksCount: githubData.forks_count,
                 openIssuesCount: githubData.open_issues_count,
-                lastAnalysisTimestamp: repo.last_analysis_timestamp,
-                isAnalyzing: repo.is_analyzing,
-                createdAt: githubData.created_at,
-                updatedAt: githubData.updated_at,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
                 url: `https://github.com/${repo.owner}/${repo.name}`,
                 visibility: githubData.visibility as 'public' | 'private',
                 defaultBranch: githubData.default_branch,
