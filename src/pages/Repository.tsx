@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
-import { useRepositoryDetails } from '../lib/hooks/use-repository-details';
 import { Loader2 } from 'lucide-react';
+import { useRepositoryDetails } from '@/lib/hooks/use-repository-details';
 
 export function Repository() {
     const { owner, name } = useParams();
@@ -16,23 +16,14 @@ export function Repository() {
         );
     }
 
-    if (error) {
+    if (error || !repository) {
         return (
             <div className="container mx-auto px-4 py-8">
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <h2 className="text-red-700 font-semibold">Error Loading Repository</h2>
-                    <p className="text-red-600 mt-1">Failed to load repository details. Please try again later.</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!repository) {
-        return (
-            <div className="container mx-auto px-4 py-8">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h2 className="text-yellow-700 font-semibold">Repository Not Found</h2>
-                    <p className="text-yellow-600 mt-1">Could not find repository {owner}/{name}</p>
+                    <p className="text-red-600 mt-1">
+                        {error instanceof Error ? error.message : 'Failed to load repository details'}
+                    </p>
                 </div>
             </div>
         );
@@ -64,8 +55,6 @@ export function Repository() {
                         <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>Stars</div>
                             <div>{repository.stargazers_count}</div>
-                            <div>Watchers</div>
-                            <div>{repository.watchers_count}</div>
                             <div>Forks</div>
                             <div>{repository.forks_count}</div>
                             <div>Open Issues</div>
@@ -82,8 +71,6 @@ export function Repository() {
                             <div>{new Date(repository.created_at).toLocaleDateString()}</div>
                             <div>Last Updated</div>
                             <div>{new Date(repository.updated_at).toLocaleDateString()}</div>
-                            <div>License</div>
-                            <div>{repository.license?.name || 'None'}</div>
                         </div>
                     </div>
                 </div>

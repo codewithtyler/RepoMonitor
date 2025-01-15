@@ -8,6 +8,9 @@ export interface GitHubRepository {
   id: number;
   name: string;
   full_name: string;
+  owner: {
+    login: string;
+  };
   description: string | null;
   html_url: string;
   visibility: string;
@@ -24,11 +27,30 @@ export interface GitHubRepository {
     name: string;
     url: string;
   } | null;
+  permissions?: {
+    admin: boolean;
+    push: boolean;
+    pull: boolean;
+  };
+}
+
+export interface SearchOptions {
+  query: string;
+  page?: number;
+  per_page?: number;
+  sort?: 'stars' | 'forks' | 'help-wanted-issues' | 'updated';
+  order?: 'asc' | 'desc';
+}
+
+export interface SearchResponse {
+  total_count: number;
+  incomplete_results: boolean;
+  items: GitHubRepository[];
 }
 
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<GitHubRepository>;
-  searchRepositories(query: string): Promise<GitHubRepository[]>;
+  searchRepositories(options: SearchOptions): Promise<SearchResponse>;
 }
 
 class GitHubClientImpl implements GitHubClient {
@@ -69,6 +91,9 @@ class GitHubClientImpl implements GitHubClient {
         GitHubTokenManager.clearToken();
         throw new Error('GitHub token is invalid or expired');
       }
+      if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+        throw new Error('rate limit exceeded');
+      }
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
@@ -94,10 +119,26 @@ class GitHubClientImpl implements GitHubClient {
     return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
-  async searchRepositories(query: string): Promise<GitHubRepository[]> {
-    console.log('Searching repositories:', query);
-    const response = await this.request<{ items: GitHubRepository[] }>(`/search/repositories?q=${encodeURIComponent(query)}`);
-    return response.items;
+  async searchRepositories(options: SearchOptions): Promise<SearchResponse> {
+    const {
+      query,
+      page = 1,
+      per_page = 10,
+      sort = 'stars',
+      order = 'desc'
+    } = options;
+
+    console.log('Searching repositories:', { query, page, per_page, sort, order });
+
+    const params = new URLSearchParams({
+      q: query,
+      page: page.toString(),
+      per_page: per_page.toString(),
+      sort,
+      order
+    });
+
+    return this.request<SearchResponse>(`/search/repositories?${params}`);
   }
 }
 

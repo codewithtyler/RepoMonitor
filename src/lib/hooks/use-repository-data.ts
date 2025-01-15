@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { getRepositoryState, subscribeToRepositories, updateRepositories, setLoading, setError } from '@/lib/repository/global-state';
 import { Repository } from '@/types/repository';
 import { v5 as uuidv5 } from 'uuid';
+import { GitHubClient, GitHubRepository } from '@/lib/github';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -89,12 +90,10 @@ export function useRepositoriesData() {
     return subscribeToRepositories(setState);
   }, []);
 
-  useQuery({
+  const { data: repositories, refetch } = useQuery({
     queryKey: ['repositories', user?.id],
     queryFn: async () => {
       console.log('[useRepositoriesData] Fetching repositories');
-      setLoading(true);
-
       try {
         if (!user) {
           console.log('[useRepositoriesData] No user found');
@@ -194,15 +193,6 @@ export function useRepositoriesData() {
               };
             } catch (error) {
               console.error(`[useRepositoriesData] Error fetching GitHub data for ${repo.owner}/${repo.name}:`, error);
-
-              // Only show toast for non-404 errors
-              if (!(error instanceof Error && error.message.includes('404'))) {
-                toast({
-                  title: 'Error',
-                  description: `Failed to fetch GitHub data for ${repo.owner}/${repo.name}`,
-                  variant: 'destructive',
-                });
-              }
               return null;
             }
           })
@@ -211,76 +201,145 @@ export function useRepositoriesData() {
         const validRepositories = repositories.filter((repo): repo is Repository => repo !== null);
         console.log('[useRepositoriesData] Final repository count:', validRepositories.length);
 
-        updateRepositories(validRepositories);
         return validRepositories;
       } catch (error) {
         console.error('[useRepositoriesData] Error:', error);
-        if (error instanceof Error) {
-          setError(error);
-        } else {
-          setError(new Error('Unknown error occurred'));
-        }
         throw error;
-      } finally {
-        setLoading(false);
       }
     },
     enabled: !!user && !!withGitHub,
+    staleTime: 30 * 1000, // Cache for 30 seconds
+    refetchOnMount: true,
   });
+
+  // Function to manually refresh GitHub data for a specific repository
+  const refreshRepositoryData = async (owner: string, name: string) => {
+    try {
+      const repository = await withGitHub(async (client) => {
+        const data = await client.getRepository(owner, name);
+
+        // Update repository in Supabase with fresh GitHub data
+        const { error: updateError } = await supabase
+          .from('repositories')
+          .update({
+            github_id: data.id,
+            owner: data.owner.login,
+            name: data.name,
+            repository_permissions: {
+              public: data.visibility === 'public',
+              private: data.visibility === 'private',
+              admin: data.permissions?.admin ?? false,
+              push: data.permissions?.push ?? false,
+              pull: data.permissions?.pull ?? false
+            },
+            is_public: data.visibility === 'public',
+            updated_at: new Date().toISOString(),
+            // Add these fields to update stats
+            stargazers_count: data.stargazers_count,
+            forks_count: data.forks_count,
+            open_issues_count: data.open_issues_count,
+            description: data.description,
+            language: data.language,
+            topics: data.topics,
+            size: data.size,
+            has_issues: data.has_issues,
+            is_archived: data.archived,
+            is_disabled: data.disabled,
+            license: data.license ? {
+              key: data.license.key,
+              name: data.license.name,
+              url: data.license.url
+            } : null
+          })
+          .eq('github_id', data.id);
+
+        if (updateError) {
+          console.error('[refreshRepositoryData] Error updating repository:', updateError);
+          throw updateError;
+        }
+
+        return data;
+      });
+
+      // Invalidate and refetch queries to update UI
+      await queryClient.invalidateQueries({ queryKey: ['repositories'] });
+      await refetch();
+
+      return repository;
+    } catch (error) {
+      console.error('[refreshRepositoryData] Error:', error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    if (repositories) {
+      updateRepositories(repositories);
+    }
+  }, [repositories]);
 
   return {
     repositories: state.repositories,
     isLoading: state.loading,
-    error: state.error
+    error: state.error,
+    refreshRepositoryData, // Expose the manual refresh function
   };
 }
 
 // Function to add a repository to tracking
-export async function addRepository(owner: string, name: string) {
-  const { withGitHub } = useGitHub();
-  const { user } = getAuthState();
-
-  if (!user) {
-    console.error('[addRepository] No user found');
-    return;
-  }
+export async function addRepository(owner: string, name: string, client: GitHubClient) {
+  console.log('[addRepository] Adding repository:', { owner, name });
 
   try {
-    // Check repository access and get permissions
-    const githubData = await withGitHub(async (client) => {
-      const data = await client.getRepository(owner, name);
-      return data;
-    });
+    // Get repository details from GitHub
+    const repository = await client.getRepository(owner, name);
 
-    const newRepo = {
-      id: generateRepoId(owner, name),
-      github_id: githubData.id,
-      owner,
-      name,
+    // Check if repository already exists
+    const { data: existingRepo } = await supabase
+      .from('repositories')
+      .select('id')
+      .eq('github_id', repository.id)
+      .single();
+
+    const repositoryData = {
+      github_id: repository.id,
+      owner: repository.owner.login,
+      name: repository.name,
       repository_permissions: {
-        public: githubData.visibility === 'public',
-        private: githubData.visibility === 'private',
-        admin: githubData.permissions?.admin ?? false,
-        push: githubData.permissions?.push ?? false,
-        pull: githubData.permissions?.pull ?? false
+        public: repository.visibility === 'public',
+        private: repository.visibility === 'private',
+        admin: repository.permissions?.admin ?? false,
+        push: repository.permissions?.push ?? false,
+        pull: repository.permissions?.pull ?? false
       },
-      is_public: githubData.visibility === 'public',
-      analyzed_by_user_id: null,
-      last_analysis_timestamp: null,
-      created_at: new Date().toISOString(),
+      is_public: repository.visibility === 'public',
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
-      .from('repositories')
-      .upsert(newRepo);
+    if (existingRepo) {
+      // Update existing repository
+      const { error: updateError } = await supabase
+        .from('repositories')
+        .update(repositoryData)
+        .eq('id', existingRepo.id);
 
-    if (error) {
-      console.error('[addRepository] Error adding repository:', error);
-      throw error;
+      if (updateError) {
+        console.error('[addRepository] Error updating repository:', updateError);
+        throw updateError;
+      }
+    } else {
+      // Insert new repository
+      const { error: insertError } = await supabase
+        .from('repositories')
+        .insert(repositoryData);
+
+      if (insertError) {
+        console.error('[addRepository] Error inserting repository:', insertError);
+        throw insertError;
+      }
     }
 
-    console.log('[addRepository] Repository added:', { owner, name });
+    return repository;
   } catch (error) {
     console.error('[addRepository] Error:', error);
     throw error;
@@ -302,4 +361,28 @@ export async function removeRepository(owner: string, name: string) {
   }
 
   console.log('[removeRepository] Repository removed:', { owner, name });
+}
+
+export function useRepositoryDetails(owner: string, name: string) {
+  const { withGitHub } = useGitHub();
+
+  return useQuery<GitHubRepository, Error>({
+    queryKey: ['repository', owner, name],
+    queryFn: async () => {
+      console.log('[useRepositoryDetails] Fetching repository:', { owner, name });
+
+      return withGitHub(async (client) => {
+        try {
+          // Get repository details directly
+          const details = await client.getRepository(owner, name);
+          return details;
+        } catch (error) {
+          console.error('[useRepositoryDetails] Error:', error);
+          throw error;
+        }
+      });
+    },
+    staleTime: 30 * 1000, // Cache for 30 seconds
+    retry: false, // Don't retry on 404s
+  });
 }

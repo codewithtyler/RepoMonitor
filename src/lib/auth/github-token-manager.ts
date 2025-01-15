@@ -94,12 +94,30 @@ export class GitHubTokenManager {
         }
       }
 
-      // If not in localStorage or invalid, clear it
-      this.clearToken();
+      // If not in localStorage or invalid, try to get from Supabase
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token) {
+        // We have a fresh token from OAuth, store and return it
+        const token = await this.handleOAuthToken(session.provider_token, session.user.id);
+        return token;
+      }
 
-      // Redirect to GitHub OAuth
-      const redirectUrl = new URL('/auth/callback', window.location.origin);
-      window.location.href = redirectUrl.toString();
+      // If we're on the callback page, wait a bit for the token to be processed
+      if (window.location.pathname === '/auth/callback') {
+        console.log('[GitHubTokenManager] On callback page, waiting for token...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const newStoredToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+        if (newStoredToken && await this.validateToken(newStoredToken)) {
+          return newStoredToken;
+        }
+      }
+
+      // If still no token, clear any invalid tokens and redirect
+      this.clearToken();
+      if (window.location.pathname !== '/auth/callback') {
+        const redirectUrl = new URL('/auth/callback', window.location.origin);
+        window.location.href = redirectUrl.toString();
+      }
 
       throw new Error('No valid GitHub token found');
     } catch (error) {
