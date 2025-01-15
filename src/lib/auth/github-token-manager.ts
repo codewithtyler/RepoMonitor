@@ -3,8 +3,30 @@ import { supabase } from './supabase-client';
 const TOKEN_STORAGE_KEY = 'github_token';
 let lastTokenUpdate = 0;
 const DEBOUNCE_TIME = 1000; // 1 second
+const TOKEN_EXPIRY = 8 * 60 * 60 * 1000; // 8 hours
+
+interface TokenData {
+  token: string;
+  expires_at: string;
+  scopes: string[];
+}
 
 export class GitHubTokenManager {
+  private static async validateToken(token: string): Promise<boolean> {
+    try {
+      const response = await fetch('https://api.github.com/user', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      return response.status === 200;
+    } catch (error) {
+      console.error('[GitHubTokenManager] Token validation failed:', error);
+      return false;
+    }
+  }
+
   static async handleOAuthToken(token: string, userId: string): Promise<string> {
     // Debounce token updates
     const now = Date.now();
@@ -21,19 +43,32 @@ export class GitHubTokenManager {
       throw new Error('Invalid token format: must start with gho_');
     }
 
+    // Validate token with GitHub API
+    const isValid = await this.validateToken(cleanToken);
+    if (!isValid) {
+      console.error('[GitHubTokenManager] Token validation failed');
+      throw new Error('Invalid GitHub token');
+    }
+
     console.log('[GitHubTokenManager] Storing token for user:', userId);
 
-    // Store in localStorage
+    const tokenData: TokenData = {
+      token: cleanToken,
+      expires_at: new Date(Date.now() + TOKEN_EXPIRY).toISOString(),
+      scopes: ['repo', 'read:user']
+    };
+
+    // Store raw token in localStorage
     localStorage.setItem(TOKEN_STORAGE_KEY, cleanToken);
 
-    // Store in database
+    // Store encrypted token in database
     const { error: updateError } = await supabase
       .from('github_tokens')
       .upsert({
         user_id: userId,
-        token: cleanToken,
-        expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
-        scopes: ['repo', 'read:user'],
+        token: cleanToken, // This will be encrypted by the database trigger
+        expires_at: tokenData.expires_at,
+        scopes: tokenData.scopes,
         last_refresh: new Date().toISOString()
       }, {
         onConflict: 'user_id'
@@ -48,29 +83,30 @@ export class GitHubTokenManager {
     return cleanToken;
   }
 
-  static async getToken(userId: string): Promise<string> {
-    // Try localStorage first
-    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (storedToken?.startsWith('gho_')) {
-      return storedToken;
-    }
+  static async getToken(): Promise<string> {
+    try {
+      // Try localStorage first
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (storedToken) {
+        // Validate the token
+        if (await this.validateToken(storedToken)) {
+          return storedToken;
+        }
+      }
 
-    // If not in localStorage, get from database
-    const { data: tokenData, error } = await supabase
-      .from('github_tokens')
-      .select('token, expires_at')
-      .eq('user_id', userId)
-      .single();
+      // If not in localStorage or invalid, clear it
+      this.clearToken();
 
-    if (error || !tokenData?.token) {
+      // Redirect to GitHub OAuth
+      const redirectUrl = new URL('/auth/callback', window.location.origin);
+      window.location.href = redirectUrl.toString();
+
+      throw new Error('No valid GitHub token found');
+    } catch (error) {
       console.error('[GitHubTokenManager] Failed to get token:', error);
+      this.clearToken();
       throw new Error('Failed to get GitHub token');
     }
-
-    // Store in localStorage for future use
-    localStorage.setItem(TOKEN_STORAGE_KEY, tokenData.token);
-
-    return tokenData.token;
   }
 
   static clearToken() {
