@@ -51,6 +51,11 @@ export interface SearchResponse {
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<GitHubRepository>;
   searchRepositories(options: SearchOptions): Promise<SearchResponse>;
+  listRepositoryIssues(owner: string, repo: string, options?: {
+    state?: 'open' | 'closed' | 'all';
+    per_page?: number;
+    page?: number;
+  }): Promise<any[]>;
 }
 
 class GitHubClientImpl implements GitHubClient {
@@ -139,6 +144,20 @@ class GitHubClientImpl implements GitHubClient {
     });
 
     return this.request<SearchResponse>(`/search/repositories?${params}`);
+  }
+
+  async listRepositoryIssues(owner: string, repo: string, options: {
+    state?: 'open' | 'closed' | 'all';
+    per_page?: number;
+    page?: number;
+  } = {}): Promise<any[]> {
+    const params = new URLSearchParams({
+      state: options.state || 'open',
+      per_page: (options.per_page || 100).toString(),
+      page: (options.page || 1).toString()
+    });
+
+    return this.request<any[]>(`/repos/${owner}/${repo}/issues?${params}`);
   }
 }
 

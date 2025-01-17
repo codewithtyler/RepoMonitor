@@ -2,6 +2,7 @@ import { Repository } from '@/types/repository';
 import { GitPullRequest, GitMerge, GitBranch, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { StatCard } from './stat-card';
+import { useMemo } from 'react';
 
 interface GlobalStatsCardProps {
   repositories: Repository[];
@@ -9,15 +10,18 @@ interface GlobalStatsCardProps {
   layoutOrder?: string[];
 }
 
-export function GlobalStatsCard({ repositories, variant = 'default', layoutOrder = ['trackedRepos', 'analyzedRepos', 'openIssues', 'activeAutomations'] }: GlobalStatsCardProps) {
-  console.log('[GlobalStatsCard] Rendering with repositories:', repositories.length);
+export function GlobalStatsCard({ repositories, variant = 'default', layoutOrder }: GlobalStatsCardProps) {
+  const stats = useMemo(() => {
+    const analyzedRepos = repositories.filter(repo => repo.lastAnalysisTimestamp).length;
+    const openIssues = repositories.reduce((sum, repo) => sum + (repo.openIssuesCount || 0), 0);
 
-  const stats = {
-    trackedRepos: repositories.length,
-    analyzedRepos: repositories.filter(r => r.lastAnalysisTimestamp).length,
-    openIssues: repositories.reduce((sum, r) => sum + (r.openIssuesCount ?? 0), 0),
-    activeAutomations: repositories.filter(r => r.isAnalyzing).length
-  };
+    return {
+      trackedRepos: repositories.length,
+      analyzedRepos,
+      openIssues,
+      activeAutomations: 0 // Coming soon
+    };
+  }, [repositories]);
 
   const statsConfig = {
     trackedRepos: {
@@ -41,8 +45,6 @@ export function GlobalStatsCard({ repositories, variant = 'default', layoutOrder
       icon: AlertCircle
     }
   };
-
-  console.log('[GlobalStatsCard] Calculated stats:', stats);
 
   return (
     <motion.div

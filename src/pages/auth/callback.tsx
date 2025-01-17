@@ -14,13 +14,6 @@ export async function loader() {
     console.error('[Auth Loader] Error getting session:', error);
   }
 
-  console.log('[Auth Loader] Session state:', {
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    userId: session?.user?.id,
-    hasProviderToken: !!session?.provider_token
-  });
-
   if (!session?.user) {
     console.log('[Auth Loader] No session found, redirecting to home');
     return redirect('/');
@@ -39,7 +32,6 @@ export function AuthCallback() {
         console.log('[Auth] Starting callback handler');
         setStatus('Starting authentication...');
 
-        // Wait for user state to be loaded
         if (loading) {
           console.log('[Auth] Waiting for user state...');
           setStatus('Loading user state...');
@@ -62,7 +54,6 @@ export function AuthCallback() {
         });
         setStatus('User authenticated, getting session...');
 
-        // Get the session to access provider token
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
           console.error('[Auth] Session error:', sessionError);
@@ -79,21 +70,14 @@ export function AuthCallback() {
           return;
         }
 
-        // Log token format (first 4 characters only)
-        console.log('[Auth] Token format check:', {
-          prefix: session.provider_token.substring(0, 4),
-          length: session.provider_token.length
-        });
         setStatus('Storing GitHub token...');
-
-        // Store the GitHub token
-        console.log('[Auth] Attempting to store GitHub token');
         await GitHubTokenManager.handleOAuthToken(session.provider_token, user.id);
         console.log('[Auth] Token stored successfully');
 
         setStatus('Success! Redirecting to dashboard...');
         await new Promise(resolve => setTimeout(resolve, 1000));
-        window.location.href = '/dashboard';
+        // Redirect back to the local dashboard
+        window.location.href = `${window.location.origin}/dashboard`;
       } catch (err) {
         console.error('[Auth] Error in callback:', err);
         setStatus('Error occurred during authentication');

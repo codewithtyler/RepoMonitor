@@ -3,6 +3,7 @@ import { Dashboard } from '../pages/Dashboard';
 import { AuthCallback } from '../pages/auth/callback';
 import { Home } from '../pages/Home';
 import { Repository } from '../pages/Repository';
+import { AnalyzePage } from '../pages/analyze/[owner]/[repo]';
 import { getAuthState, subscribeToAuth } from '../lib/auth/global-state';
 import { useEffect, useState } from 'react';
 
@@ -39,6 +40,7 @@ export function AppRouter() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/repository/:owner/:name" element={<ProtectedRoute><Repository /></ProtectedRoute>} />
+      <Route path="/analyze/:owner/:name" element={<ProtectedRoute><AnalyzePage /></ProtectedRoute>} />
     </Routes>
   );
 }

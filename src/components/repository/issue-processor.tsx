@@ -184,6 +184,7 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
   const { withGitHub } = useGitHub();
   const [currentStage, setCurrentStage] = useState<number>(0);
   const pollIntervalRef = useRef<number>();
+  const [initializing, setInitializing] = useState(true);
   const [stages, setStages] = useState<Stage[]>([
     {
       id: 1,
@@ -841,8 +842,66 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
     }
   };
 
-  if (!mounted) {
-    return null;
+  // Add initialization effect
+  useEffect(() => {
+    let isMounted = true;
+
+    const initialize = async () => {
+      try {
+        // Check for existing job
+        const { data: existingJob } = await supabase
+          .from('analysis_jobs')
+          .select('*')
+          .eq('repository_id', repositoryId)
+          .in('status', ['fetching', 'processing', 'analyzing'])
+          .single();
+
+        if (existingJob && isMounted) {
+          setLoading(true);
+          setStartTime(existingJob.created_at);
+          setCurrentStage(existingJob.processing_stage_number);
+          updateStageProgress(
+            existingJob.processing_stage_number,
+            existingJob.stage_progress,
+            `Resuming analysis...`
+          );
+        }
+
+        // Check for cancelled job that can be resumed
+        const { data: cancelledJob } = await supabase
+          .from('analysis_jobs')
+          .select('*')
+          .eq('repository_id', repositoryId)
+          .eq('status', 'cancelled')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (cancelledJob && isMounted) {
+          setCanResume(true);
+        }
+      } catch (error) {
+        console.error('Error initializing issue processor:', error);
+      } finally {
+        if (isMounted) {
+          setInitializing(false);
+        }
+      }
+    };
+
+    initialize();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [repositoryId]);
+
+  if (!mounted || initializing) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+      </div>
+    );
   }
 
   return (
