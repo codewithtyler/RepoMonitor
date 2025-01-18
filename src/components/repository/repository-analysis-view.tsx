@@ -17,11 +17,13 @@ interface RepositoryAnalysisViewProps {
     open_issues_count?: number;
     subscribers_count?: number;
     last_analysis_timestamp?: string;
+    is_tracked?: boolean;
   };
   onRunAnalysis?: () => void;
+  onTrack?: () => void;
 }
 
-export function RepositoryAnalysisView({ repository: propRepository, onRunAnalysis }: RepositoryAnalysisViewProps) {
+export function RepositoryAnalysisView({ repository: propRepository, onRunAnalysis, onTrack }: RepositoryAnalysisViewProps) {
   const { owner, name } = useParams();
   const navigate = useNavigate();
   const [activeJob, setActiveJob] = useState(null);
@@ -30,6 +32,7 @@ export function RepositoryAnalysisView({ repository: propRepository, onRunAnalys
   const { withGitHub } = useGitHub();
   const [isLoading, setIsLoading] = useState(true);
   const [repositoryId, setRepositoryId] = useState<string | null>(null);
+  const [isTracked, setIsTracked] = useState(propRepository?.is_tracked || false);
 
   useEffect(() => {
     let isMounted = true;
@@ -185,6 +188,18 @@ export function RepositoryAnalysisView({ repository: propRepository, onRunAnalys
 
   return (
     <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">{repository.owner}/{repository.name}</h2>
+        <button
+          onClick={onTrack}
+          className={`px-4 py-2 rounded-md transition-colors ${isTracked
+            ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+            : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            }`}
+        >
+          {isTracked ? 'Tracked' : 'Track Repository'}
+        </button>
+      </div>
       <IssueProcessor
         repositoryId={repositoryId}
         owner={repository.owner}

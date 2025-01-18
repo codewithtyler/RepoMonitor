@@ -8,12 +8,13 @@ import { NotificationDropdown } from '../components/common/notification-dropdown
 import { SearchBar } from '../components/search/search-bar';
 import { UserProfile } from '../components/common/user-profile';
 import { theme } from '../config/theme';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RepoStatsCard } from '../components/common/repo-stats-card';
 import { motion } from 'framer-motion';
 import { IssueProcessor } from '../components/repository/issue-processor';
+import { toast } from '../hooks/use-toast';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -34,12 +35,46 @@ interface DashboardStats {
 
 function DashboardContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<{ owner: string; name: string } | null>(null);
+  const { repositories, isLoading, error, trackRepository } = useRepositoriesData();
+
+  // Handle repository selection from search
+  useEffect(() => {
+    if (location.state?.owner && location.state?.name) {
+      setSelectedRepo({
+        owner: location.state.owner,
+        name: location.state.name
+      });
+
+      // Clear the location state to prevent re-selecting on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state]);
+
+  const handleTrackRepository = async () => {
+    if (!selectedRepo) return;
+
+    try {
+      await trackRepository(selectedRepo.owner, selectedRepo.name);
+      toast({
+        title: 'Repository Tracked',
+        description: `Successfully tracked ${selectedRepo.owner}/${selectedRepo.name}`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Error tracking repository:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to track repository. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   try {
     const { user } = getAuthState();
-    const { repositories, isLoading, error } = useRepositoriesData();
 
     if (error) {
       console.error('[Dashboard] Error:', error);
@@ -79,8 +114,10 @@ function DashboardContent() {
         <header className="h-14 border-b" style={{ borderColor: theme.colors.border.primary }}>
           <div className="flex items-center justify-between px-4 h-full">
             <HeaderLogo />
-            <div className="flex-1 flex items-center justify-center">
-              <SearchBar />
+            <div className="flex-1 flex items-center justify-center max-w-2xl mx-auto">
+              <div className="w-[500px]">
+                <SearchBar />
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <NotificationDropdown />
@@ -226,12 +263,14 @@ function DashboardContent() {
                         </div>
 
                         {/* Issue Analysis Section */}
-                        <div className="space-y-4 mt-6">
+                        <div className="mt-6">
                           {selectedRepo && (
                             <IssueProcessor
                               repositoryId={repositories.find(r => r.owner === selectedRepo.owner && r.name === selectedRepo.name)?.id || ''}
                               owner={selectedRepo.owner}
                               name={selectedRepo.name}
+                              onTrack={handleTrackRepository}
+                              is_tracked={repositories.some(r => r.owner === selectedRepo.owner && r.name === selectedRepo.name)}
                             />
                           )}
                         </div>

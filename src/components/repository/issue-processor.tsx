@@ -13,6 +13,8 @@ interface IssueProcessorProps {
   repositoryId: string;
   owner: string;
   name: string;
+  onTrack?: () => void;
+  is_tracked?: boolean;
 }
 
 const ANALYSIS_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes - hard timeout
@@ -168,7 +170,7 @@ function StageIndicator({ stages }: { stages: Stage[] }) {
   );
 }
 
-export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProps) {
+export function IssueProcessor({ repositoryId, owner, name, onTrack, is_tracked }: IssueProcessorProps) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string>('');
@@ -847,16 +849,30 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
     let isMounted = true;
 
     const initialize = async () => {
+      if (!repositoryId) {
+        console.error('Repository ID is missing');
+        if (isMounted) {
+          setInitializing(false);
+        }
+        return;
+      }
+
       try {
+        console.log('Checking for existing jobs for repository:', repositoryId);
         // Check for existing job
-        const { data: existingJob } = await supabase
+        const { data: existingJob, error: existingJobError } = await supabase
           .from('analysis_jobs')
           .select('*')
           .eq('repository_id', repositoryId)
           .in('status', ['fetching', 'processing', 'analyzing'])
           .single();
 
+        if (existingJobError) {
+          console.error('Error fetching existing job:', existingJobError);
+        }
+
         if (existingJob && isMounted) {
+          console.log('Found existing job:', existingJob);
           setLoading(true);
           setStartTime(existingJob.created_at);
           setCurrentStage(existingJob.processing_stage_number);
@@ -868,7 +884,7 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
         }
 
         // Check for cancelled job that can be resumed
-        const { data: cancelledJob } = await supabase
+        const { data: cancelledJob, error: cancelledJobError } = await supabase
           .from('analysis_jobs')
           .select('*')
           .eq('repository_id', repositoryId)
@@ -877,7 +893,12 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
           .limit(1)
           .single();
 
+        if (cancelledJobError) {
+          console.error('Error fetching cancelled job:', cancelledJobError);
+        }
+
         if (cancelledJob && isMounted) {
+          console.log('Found cancelled job that can be resumed:', cancelledJob);
           setCanResume(true);
         }
       } catch (error) {
@@ -905,51 +926,23 @@ export function IssueProcessor({ repositoryId, owner, name }: IssueProcessorProp
   }
 
   return (
-    <div className="space-y-6">
-      {/* Repository Stats Cards */}
-      <motion.div
-        className="grid grid-cols-4 gap-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <RepoStatsCard
-          id="openIssues"
-          title="Open Issues"
-          value={openIssuesCount.toString()}
-          description="Total open issues"
-          icon={GitPullRequest}
-        />
-        <RepoStatsCard
-          id="duplicateIssues"
-          title="Duplicate Issues - Coming Soon™"
-          value={duplicateCount.toString()}
-          description="From last analysis"
-          icon={GitMerge}
-        />
-        <RepoStatsCard
-          id="estimatedDuplicates"
-          title="Est. Duplicates - Coming Soon™"
-          value="0"
-          description="Based on historical trends"
-          icon={GitBranch}
-        />
-        <RepoStatsCard
-          id="averageIssues"
-          title="Average Age - Coming Soon™"
-          value="0"
-          description="Per open issue"
-          icon={AlertCircle}
-        />
-      </motion.div>
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-medium mb-4" style={{ color: theme.colors.text.primary }}>
+            Issue Analysis
+          </h3>
+          <p className="text-sm mb-6" style={{ color: theme.colors.text.secondary }}>
+            Analyze enhancement issues for duplicates
+          </p>
+        </div>
 
-      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium" style={{ color: theme.colors.text.primary }}>
               Issue Analysis
             </h3>
-            <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
+            <p className="text-sm mt-1" style={{ color: theme.colors.text.secondary }}>
               {loading ? (
                 <>
                   Analysis in progress - please do not close this window
