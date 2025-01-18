@@ -1,93 +1,82 @@
-import { GitFork, GitPullRequest, X, Activity } from 'lucide-react';
 import { theme } from '@/config/theme';
-
-interface Repository {
-  id: number;
-  name: string;
-  owner: {
-    login: string;
-  };
-  description: string | null;
-  private: boolean;
-  stargazers_count: number;
-}
+import { X } from 'lucide-react';
 
 interface RepositoryActionModalProps {
-  repository: Repository | null;
+  isOpen: boolean;
   onClose: () => void;
-  onTrack: (repo: Repository) => void;
-  onAnalyze: (repo: Repository) => void;
+  onTrack: () => Promise<void>;
+  onAnalyze: () => Promise<void>;
+  repository: {
+    owner: string;
+    name: string;
+    description?: string;
+    stargazersCount?: number;
+  };
 }
 
-export function RepositoryActionModal({ repository, onClose, onTrack, onAnalyze }: RepositoryActionModalProps) {
-  if (!repository) return null;
+export function RepositoryActionModal({
+  isOpen,
+  onClose,
+  onTrack,
+  onAnalyze,
+  repository,
+}: RepositoryActionModalProps) {
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/50"
+      <div
+        className="fixed inset-0 bg-black/50"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div 
-        className="relative w-full max-w-md rounded-lg border p-6"
-        style={{ 
-          backgroundColor: theme.colors.background.secondary,
-          borderColor: theme.colors.border.primary
-        }}
-      >
+      <div className="relative z-50 w-full max-w-md rounded-lg p-6" style={{ backgroundColor: theme.colors.background.primary }}>
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-500/10 transition-colors"
-          style={{ color: theme.colors.text.secondary }}
+          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
         </button>
 
-        {/* Repository info */}
-        <div className="flex items-start gap-3 mb-6">
-          <div className="flex-shrink-0 mt-1">
-            {repository.private ? (
-              <GitPullRequest className="h-5 w-5" style={{ color: theme.colors.text.secondary }} />
-            ) : (
-              <GitFork className="h-5 w-5" style={{ color: theme.colors.text.secondary }} />
-            )}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
-              {repository.owner.login}/{repository.name}
-            </h3>
-            {repository.description && (
-              <p className="mt-1" style={{ color: theme.colors.text.secondary }}>
-                {repository.description}
-              </p>
-            )}
-          </div>
+        {/* Header */}
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
+            {repository.owner}/{repository.name}
+          </h2>
+          {repository.description && (
+            <p className="mt-2 text-sm" style={{ color: theme.colors.text.secondary }}>
+              {repository.description}
+            </p>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="space-y-3">
+        <div className="flex flex-col gap-2">
           <button
-            onClick={() => onTrack(repository)}
-            className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors hover:opacity-80"
-            style={{ backgroundColor: theme.colors.brand.primary, color: theme.colors.text.primary }}
+            onClick={onTrack}
+            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: theme.colors.background.secondary,
+              color: theme.colors.text.primary,
+            }}
           >
-            <GitFork className="h-4 w-4" />
             Track Repository
           </button>
           <button
-            onClick={() => onAnalyze(repository)}
-            className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors hover:opacity-80"
-            style={{ backgroundColor: theme.colors.background.primary, color: theme.colors.text.primary }}
+            onClick={onAnalyze}
+            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: theme.colors.brand.primary,
+              color: theme.colors.text.inverse,
+            }}
           >
-            <Activity className="h-4 w-4" />
-            Analyze Repository
+            Start Analysis
           </button>
         </div>
       </div>
     </div>
   );
-} 
+}

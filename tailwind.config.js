@@ -51,6 +51,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        scrollbar: {
+          track: '#0d1117',  // Dark background
+          thumb: '#30363d',  // Border primary
+          hover: '#475569',  // Border secondary
+        }
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -83,5 +88,8 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
-} 
+  plugins: [
+    require("tailwindcss-animate"),
+    require("tailwind-scrollbar")({ nocompatible: true }),
+  ],
+}

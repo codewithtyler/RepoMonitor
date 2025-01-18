@@ -1,23 +1,19 @@
 import { useParams } from 'react-router-dom';
-import { IssueProcessor } from '@/components/repository/issue-processor';
+import { RepositoryAnalysisView } from '@/components/repository/repository-analysis-view';
 import { useUser } from '@/lib/auth/hooks';
 
 export function AnalyzePage() {
-  const { owner, repo } = useParams();
+  const { owner, name } = useParams();
   const { user } = useUser();
 
-  if (!owner || !repo || !user) {
+  if (!owner || !name || !user) {
     return <div>Invalid repository or not logged in</div>;
   }
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">{owner}/{repo}</h1>
-      <IssueProcessor
-        repositoryId={`${owner}/${repo}`}
-        owner={owner}
-        name={repo}
-      />
+      <h1 className="text-2xl font-bold mb-6">{owner}/{name}</h1>
+      <RepositoryAnalysisView />
     </div>
   );
 }

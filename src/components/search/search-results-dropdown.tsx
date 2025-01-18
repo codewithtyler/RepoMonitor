@@ -1,90 +1,102 @@
-import { GitFork, Star } from 'lucide-react';
+import { GitHubRepository } from '@/lib/github';
+import { Loader2, Star, GitFork, AlertCircle } from 'lucide-react';
 import { theme } from '@/config/theme';
-import { formatNumber } from '@/lib/utils/format';
-
-interface Repository {
-  id: number;
-  name: string;
-  owner: {
-    login: string;
-  };
-  description: string | null;
-  private: boolean;
-  stargazers_count: number;
-}
 
 interface SearchResultsDropdownProps {
-  results: Repository[];
+  results: GitHubRepository[];
   isLoading: boolean;
-  onSelect: (repo: Repository) => void;
-  show: boolean;
+  error: Error | null;
+  hasMore: boolean;
+  onLoadMore: () => void;
+  onSelect: (result: GitHubRepository) => Promise<void>;
 }
 
 export function SearchResultsDropdown({
   results,
   isLoading,
-  onSelect,
-  show
+  error,
+  hasMore,
+  onLoadMore,
+  onSelect
 }: SearchResultsDropdownProps) {
-  if (!show || (!isLoading && results.length === 0)) {
+  if (!isLoading && !error && results.length === 0) {
     return null;
   }
 
   return (
-    <div
-      className="absolute top-full left-0 right-0 mt-2 rounded-lg border overflow-hidden z-50"
+    <div className="absolute z-50 w-full mt-1 bg-white rounded-md shadow-lg border"
       style={{
         backgroundColor: theme.colors.background.secondary,
         borderColor: theme.colors.border.primary
-      }}
-    >
-      {isLoading ? (
-        <div className="p-2 text-center text-sm" style={{ color: theme.colors.text.secondary }}>
-          Searching repositories...
+      }}>
+      {error && (
+        <div className="p-4 text-sm text-red-500 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>Error: {error.message}</span>
         </div>
-      ) : (
-        <div className="max-h-[300px] overflow-y-auto">
-          {results.map((repo) => (
-            <button
-              key={repo.id}
-              onClick={() => onSelect(repo)}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-500/10 flex items-center justify-between"
-            >
-              <div className="flex items-center min-w-0">
-                <GitFork className="h-4 w-4 mr-2 shrink-0" style={{ color: theme.colors.text.secondary }} />
-                <div className="truncate">
-                  <span style={{ color: theme.colors.text.primary }}>{repo.owner.login}/</span>
-                  <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
-                  {repo.description && (
-                    <p className="text-xs truncate" style={{ color: theme.colors.text.secondary }}>
-                      {repo.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-              {repo.stargazers_count > 0 && (
-                <div
-                  className="ml-4 flex items-center text-xs"
-                  style={{ color: theme.colors.text.secondary }}
-                >
-                  <Star className="h-3 w-3 mr-1" />
-                  {formatNumber(repo.stargazers_count)}
-                </div>
-              )}
-            </button>
-          ))}
-          {results.length === 10 && (
-            <div
-              className="px-3 py-2 text-xs text-center border-t"
-              style={{
-                color: theme.colors.text.secondary,
-                borderColor: theme.colors.border.primary
-              }}
-            >
-              Showing top 10 results. Refine your search to find more repositories.
-            </div>
+      )}
+
+      {isLoading && results.length === 0 && (
+        <div className="p-4 text-sm flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Searching repositories...</span>
+        </div>
+      )}
+
+      {results.map((result) => (
+        <button
+          key={result.id}
+          onClick={() => onSelect(result)}
+          className="w-full p-3 text-left hover:bg-gray-100 flex flex-col gap-1 border-b last:border-b-0"
+          style={{
+            borderColor: theme.colors.border.primary,
+            '&:hover': {
+              backgroundColor: theme.colors.background.hover
+            }
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <span className="font-medium">{result.full_name}</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
+              {result.visibility}
+            </span>
+          </div>
+          {result.description && (
+            <p className="text-sm text-gray-600 line-clamp-2">{result.description}</p>
           )}
-        </div>
+          <div className="flex items-center gap-4 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <Star className="h-4 w-4" />
+              {result.stargazers_count}
+            </span>
+            <span className="flex items-center gap-1">
+              <GitFork className="h-4 w-4" />
+              {result.forks_count}
+            </span>
+          </div>
+        </button>
+      ))}
+
+      {hasMore && (
+        <button
+          onClick={onLoadMore}
+          className="w-full p-2 text-sm text-center hover:bg-gray-100 border-t"
+          style={{
+            borderColor: theme.colors.border.primary,
+            '&:hover': {
+              backgroundColor: theme.colors.background.hover
+            }
+          }}
+        >
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading more...
+            </span>
+          ) : (
+            'Load more results'
+          )}
+        </button>
       )}
     </div>
   );

@@ -8,11 +8,13 @@ import { NotificationDropdown } from '../components/common/notification-dropdown
 import { SearchBar } from '../components/search/search-bar';
 import { UserProfile } from '../components/common/user-profile';
 import { theme } from '../config/theme';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RepoStatsCard } from '../components/common/repo-stats-card';
 import { motion } from 'framer-motion';
+import { IssueProcessor } from '../components/repository/issue-processor';
+import { toast } from '../hooks/use-toast';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -32,33 +34,54 @@ interface DashboardStats {
 }
 
 function DashboardContent() {
-  console.log('[Dashboard/Content] Starting render');
-
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<{ owner: string; name: string } | null>(null);
+  const { repositories, isLoading, error, trackRepository } = useRepositoriesData();
+
+  // Handle repository selection from search
+  useEffect(() => {
+    if (location.state?.owner && location.state?.name) {
+      setSelectedRepo({
+        owner: location.state.owner,
+        name: location.state.name
+      });
+
+      // Clear the location state to prevent re-selecting on refresh
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state]);
+
+  const handleTrackRepository = async () => {
+    if (!selectedRepo) return;
+
+    try {
+      await trackRepository(selectedRepo.owner, selectedRepo.name);
+      toast({
+        title: 'Repository Tracked',
+        description: `Successfully tracked ${selectedRepo.owner}/${selectedRepo.name}`,
+        variant: 'default'
+      });
+    } catch (error) {
+      console.error('Error tracking repository:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to track repository. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   try {
-    console.log('[Dashboard/Content] Getting auth state');
     const { user } = getAuthState();
-    console.log('[Dashboard/Content] Auth state:', { hasUser: !!user, userId: user?.id });
-
-    console.log('[Dashboard/Content] About to call useRepositoriesData');
-    const { repositories, isLoading, error } = useRepositoriesData();
-    console.log('[Dashboard/Content] useRepositoriesData returned:', {
-      hasRepositories: !!repositories,
-      repositoryCount: repositories?.length,
-      isLoading,
-      hasError: !!error
-    });
 
     if (error) {
-      console.error('[Dashboard/Content] Error from useRepositoriesData:', error);
+      console.error('[Dashboard] Error:', error);
       throw error;
     }
 
     if (isLoading) {
-      console.log('[Dashboard/Content] Rendering loading state');
       return (
         <div className="flex items-center justify-center h-screen" style={{ backgroundColor: theme.colors.background.primary }}>
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.colors.text.secondary }} />
@@ -67,7 +90,6 @@ function DashboardContent() {
     }
 
     if (!repositories) {
-      console.log('[Dashboard/Content] No repositories found');
       return (
         <div className="flex items-center justify-center h-screen" style={{ backgroundColor: theme.colors.background.primary }}>
           <div className="text-center" style={{ color: theme.colors.text.secondary }}>
@@ -76,8 +98,6 @@ function DashboardContent() {
         </div>
       );
     }
-
-    console.log('[Dashboard/Content] About to render dashboard with repositories:', repositories.length);
 
     const handleRepoClick = (owner: string, name: string) => {
       if (isAnimating) return;
@@ -93,9 +113,11 @@ function DashboardContent() {
         {/* Navbar - Fixed height */}
         <header className="h-14 border-b" style={{ borderColor: theme.colors.border.primary }}>
           <div className="flex items-center justify-between px-4 h-full">
-            <div className="flex items-center gap-4 flex-1">
-              <HeaderLogo />
-              <SearchBar />
+            <HeaderLogo />
+            <div className="flex-1 flex items-center justify-center max-w-2xl mx-auto">
+              <div className="w-[500px]">
+                <SearchBar />
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <NotificationDropdown />
@@ -241,57 +263,16 @@ function DashboardContent() {
                         </div>
 
                         {/* Issue Analysis Section */}
-                        <div className="space-y-4 mt-6">
-                          <div>
-                            <h3 className="text-lg font-medium" style={{ color: theme.colors.text.primary }}>
-                              Issue Analysis
-                            </h3>
-                            <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-                              Analysis in progress - please do not close this window
-                              <span className="ml-1 opacity-75">(Started about 1 hour ago)</span>
-                            </p>
-                          </div>
-
-                          <div className="space-y-4">
-                            {/* Stage 1 */}
-                            <div className="flex items-center gap-4">
-                              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                                <span className="text-xs text-white">100%</span>
-                              </div>
-                              <div>
-                                <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>Stage 1: Data Collection</h4>
-                                <p className="text-sm" style={{ color: theme.colors.text.secondary }}>Fetching issues from GitHub repository</p>
-                                <p className="text-sm" style={{ color: theme.colors.text.secondary }}>Fetched 13 issues</p>
-                              </div>
-                            </div>
-
-                            {/* Stage 2 */}
-                            <div className="flex items-center gap-4">
-                              <div className="w-8 h-8 rounded-full border-2 border-gray-700" />
-                              <div>
-                                <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>Stage 2: Processing Issues</h4>
-                                <p className="text-sm" style={{ color: theme.colors.text.secondary }}>Generating embeddings for similarity detection</p>
-                              </div>
-                            </div>
-
-                            {/* Stage 3 */}
-                            <div className="flex items-center gap-4">
-                              <div className="w-8 h-8 rounded-full border-2 border-gray-700" />
-                              <div>
-                                <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>Stage 3: Analyzing Issues</h4>
-                                <p className="text-sm" style={{ color: theme.colors.text.secondary }}>Searching for potential duplicates</p>
-                              </div>
-                            </div>
-
-                            {/* Stage 4 */}
-                            <div className="flex items-center gap-4">
-                              <div className="w-8 h-8 rounded-full border-2 border-gray-700" />
-                              <div>
-                                <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>Stage 4: Generating Report</h4>
-                                <p className="text-sm" style={{ color: theme.colors.text.secondary }}>Preparing analysis results</p>
-                              </div>
-                            </div>
-                          </div>
+                        <div className="mt-6">
+                          {selectedRepo && (
+                            <IssueProcessor
+                              repositoryId={repositories.find(r => r.owner === selectedRepo.owner && r.name === selectedRepo.name)?.id || ''}
+                              owner={selectedRepo.owner}
+                              name={selectedRepo.name}
+                              onTrack={handleTrackRepository}
+                              is_tracked={repositories.some(r => r.owner === selectedRepo.owner && r.name === selectedRepo.name)}
+                            />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -314,11 +295,7 @@ function DashboardContent() {
               >
                 <div className="h-full p-4">
                   <div className="space-y-4">
-                    <GlobalStatsCard
-                      repositories={repositories}
-                      variant="compact"
-                      layoutOrder={['trackedRepos', 'analyzedRepos', 'openIssues', 'activeAutomations']}
-                    />
+                    {/* Right sidebar content can go here if needed */}
                   </div>
                 </div>
               </motion.div>
@@ -328,37 +305,18 @@ function DashboardContent() {
       </div>
     );
 
-    console.log('[Dashboard/Content] Successfully created content');
     return content;
   } catch (error) {
-    console.error('[Dashboard/Content] Error during render:', error);
-    if (error instanceof Error) {
-      console.error('[Dashboard/Content] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
+    console.error('[Dashboard] Error:', error);
     throw error;
   }
 }
 
 export function Dashboard() {
-  console.log('[Dashboard] Starting render');
   try {
-    console.log('[Dashboard] About to render content');
-    const content = <DashboardContent />;
-    console.log('[Dashboard] Successfully created content');
-    return content;
+    return <DashboardContent />;
   } catch (error) {
-    console.error('[Dashboard] Error during render:', error);
-    if (error instanceof Error) {
-      console.error('[Dashboard] Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
+    console.error('[Dashboard] Error:', error);
     throw error;
   }
 }
