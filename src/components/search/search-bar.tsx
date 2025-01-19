@@ -3,6 +3,18 @@ import { Search, Star, Clock, X } from 'lucide-react';
 import { useSearch } from '@/lib/contexts/search-context';
 import { theme } from '@/config/theme';
 
+interface SearchResult {
+  id: number;
+  name: string;
+  owner: {
+    login: string;
+  };
+  description: string | null;
+  private: boolean;
+  stargazers_count: number;
+  category?: 'exact' | 'owned' | 'favorited' | null;
+}
+
 const RESULTS_PER_PAGE = 10; // Match the context's RESULTS_PER_PAGE
 const RESULTS_PER_API_CALL = 30; // Number of results per API call
 
@@ -71,13 +83,16 @@ export function SearchBar() {
   }, {} as Record<string, typeof results>);
 
   // Debug log the grouped results
-  console.log('Grouped results:', {
+  console.log('Search Bar - Results:', results);
+  console.log('Search Bar - Grouped Results:', {
+    exact: groupedResults['exact']?.length || 0,
     owned: groupedResults['owned']?.length || 0,
     favorited: groupedResults['favorited']?.length || 0,
-    other: groupedResults['other']?.length || 0
+    other: groupedResults['other']?.length || 0,
+    categories: results.map(r => ({ repo: `${r.owner.login}/${r.name}`, category: r.category }))
   });
 
-  const renderRepository = (repo: SearchResult) => (
+  const renderRepository = (repo: SearchResult, index: number) => (
     <div
       key={repo.id}
       onClick={() => {
@@ -88,11 +103,19 @@ export function SearchBar() {
     >
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-            {repo.owner.login}/{repo.name}
-          </span>
+          <div className="flex items-center">
+            <div
+              className="w-8 flex items-center justify-center mr-2 text-sm"
+              style={{ color: theme.colors.text.secondary }}
+            >
+              {String(index).padStart(2, '0')}
+            </div>
+            <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+              {repo.owner.login}/{repo.name}
+            </span>
+          </div>
           {repo.description && (
-            <span className="text-xs line-clamp-2" style={{ color: theme.colors.text.secondary }}>
+            <span className="text-xs line-clamp-2 ml-10" style={{ color: theme.colors.text.secondary }}>
               {repo.description}
             </span>
           )}
@@ -110,8 +133,7 @@ export function SearchBar() {
       className="sticky top-0 px-3 py-2 text-xs font-medium bg-opacity-90 backdrop-blur-sm"
       style={{
         backgroundColor: theme.colors.background.secondary,
-        color: theme.colors.text.secondary,
-        borderBottom: `1px solid ${theme.colors.border.primary}`
+        color: theme.colors.text.secondary
       }}
     >
       {title}
@@ -120,7 +142,7 @@ export function SearchBar() {
 
   const renderSeparator = (isNewAPIBatch = false) => (
     <div
-      className={`h-px my-2 ${isNewAPIBatch ? 'opacity-40' : 'opacity-20'}`}
+      className={`h-px my-2 opacity-40`}
       style={{
         backgroundColor: theme.colors.border.primary,
       }}
@@ -140,6 +162,90 @@ export function SearchBar() {
       )}
     </div>
   );
+
+  const SearchResults = () => {
+    const { results, loading, hasNextPage, fetchNextPage } = useSearch();
+    const [displayedResults, setDisplayedResults] = useState<number>(RESULTS_PER_PAGE);
+    const hasMoreResults = displayedResults < results.length;
+    const isEndOfResults = results.length === RESULTS_PER_API_CALL;
+
+    const handleLoadMore = () => {
+      setDisplayedResults(prev => Math.min(prev + RESULTS_PER_PAGE, results.length));
+    };
+
+    // Group results by category
+    const groupedResults = results.slice(0, displayedResults).reduce((acc, result) => {
+      const category = result.category || 'other';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(result);
+      return acc;
+    }, {} as Record<string, Repository[]>);
+
+    const renderSeparator = () => (
+      <div
+        className="h-px my-2 opacity-40"
+        style={{ backgroundColor: theme.colors.border.primary }}
+      />
+    );
+
+    const renderLoadMore = () => (
+      <div className="flex justify-center py-2">
+        <button
+          onClick={handleLoadMore}
+          className="text-sm text-muted hover:text-primary transition-colors"
+        >
+          Load More
+        </button>
+      </div>
+    );
+
+    const renderEndOfResults = () => (
+      <div className="text-center py-2 text-sm text-muted">
+        End of search results
+      </div>
+    );
+
+    if (loading) {
+      return <div className="p-4 text-center">Loading...</div>;
+    }
+
+    if (!results.length) {
+      return <div className="p-4 text-center">No results found</div>;
+    }
+
+    return (
+      <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-neutral-900 scrollbar-thumb-neutral-700 hover:scrollbar-thumb-neutral-600">
+        {/* Owned Repositories */}
+        {groupedResults.owned?.length > 0 && (
+          <>
+            <div className="px-3 py-2 text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+              Your Repositories
+            </div>
+            {groupedResults.owned.map((result, index) => renderRepository(result, index + 1))}
+            {renderSeparator()}
+          </>
+        )}
+
+        {/* Other Results */}
+        {groupedResults.other?.length > 0 && (
+          <>
+            <div className="px-3 py-2 text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+              {groupedResults.owned?.length ? 'Search Results' : 'All Results'}
+            </div>
+            {groupedResults.other.map((result, index) =>
+              renderRepository(result, (groupedResults.owned?.length || 0) + index + 1)
+            )}
+          </>
+        )}
+
+        {/* Load More or End of Results */}
+        {hasMoreResults && renderLoadMore()}
+        {isEndOfResults && !hasMoreResults && renderEndOfResults()}
+      </div>
+    );
+  };
 
   return (
     <div ref={searchRef} className="relative">
@@ -170,7 +276,7 @@ export function SearchBar() {
           }}
         >
           {query.length === 0 && recentSearches.length > 0 ? (
-            <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-scrollbar-track scrollbar-thumb-scrollbar-thumb hover:scrollbar-thumb-scrollbar-hover">
+            <div className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-background-primary scrollbar-thumb-border-primary hover:scrollbar-thumb-muted">
               <div className="flex items-center justify-between px-3 py-2">
                 <span className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
                   Recent Searches
@@ -214,72 +320,41 @@ export function SearchBar() {
             </div>
           ) : results.length > 0 ? (
             <div
-              className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-scrollbar-track scrollbar-thumb-scrollbar-thumb hover:scrollbar-thumb-scrollbar-hover"
+              className="max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-neutral-900 scrollbar-thumb-neutral-700 hover:scrollbar-thumb-neutral-600"
             >
-              {/* Exact Matches */}
-              {groupedResults['exact']?.length > 0 && (
-                <div>
-                  {renderCategoryHeader('Exact Match')}
-                  {groupedResults['exact'].map(repo => (
-                    <div key={repo.id}>
-                      {renderRepository(repo)}
-                    </div>
-                  ))}
-                  {(groupedResults['owned']?.length > 0 || groupedResults['favorited']?.length > 0 || groupedResults['other']?.length > 0) && renderSeparator()}
-                </div>
-              )}
-
               {/* Owned Repositories */}
               {groupedResults['owned']?.length > 0 && (
-                <div>
-                  {renderCategoryHeader('Owned')}
-                  {groupedResults['owned'].map(repo => (
-                    <div key={repo.id}>
-                      {renderRepository(repo)}
-                    </div>
-                  ))}
-                  {(groupedResults['favorited']?.length > 0 || groupedResults['other']?.length > 0) && renderSeparator()}
-                </div>
+                <>
+                  <div className="px-3 py-2 text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+                    Your Repositories
+                  </div>
+                  {groupedResults['owned'].map((result, index) => renderRepository(result, index + 1))}
+                  {renderSeparator()}
+                </>
               )}
 
-              {/* Favorited Repositories */}
-              {groupedResults['favorited']?.length > 0 && (
-                <div>
-                  {renderCategoryHeader('Favorited')}
-                  {groupedResults['favorited'].map(repo => (
-                    <div key={repo.id}>
-                      {renderRepository(repo)}
-                    </div>
-                  ))}
-                  {groupedResults['other']?.length > 0 && renderSeparator()}
-                </div>
-              )}
-
-              {/* Other Repositories */}
+              {/* Other Results */}
               {groupedResults['other']?.length > 0 && (
-                <div>
-                  {groupedResults['exact']?.length === 0 && groupedResults['owned']?.length === 0 && groupedResults['favorited']?.length === 0 && renderCategoryHeader('All Results')}
-                  {groupedResults['other'].map((repo, index) => {
-                    const isLastInAPIBatch = (index + 1) % RESULTS_PER_API_CALL === 0;
-                    const isNewAPIBatch = isLastInAPIBatch && index + 1 < groupedResults['other'].length;
-                    return (
-                      <div key={repo.id}>
-                        {renderRepository(repo)}
-                        {isNewAPIBatch && renderSeparator(true)}
-                      </div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="px-3 py-2 text-sm font-medium" style={{ color: theme.colors.text.primary }}>
+                    {groupedResults['owned']?.length ? 'Search Results' : 'All Results'}
+                  </div>
+                  {groupedResults['other'].map((result, index) =>
+                    renderRepository(result, (groupedResults['owned']?.length || 0) + index + 1)
+                  )}
+                </>
               )}
 
-              {/* Infinite scroll observer */}
+              {/* Load More Indicator */}
               {hasNextPage && (
-                <div
-                  ref={observerRef}
-                  className="p-4 text-center text-sm"
-                  style={{ color: theme.colors.text.secondary }}
-                >
-                  {loading ? 'Loading more...' : 'Scroll to load more results'}
+                <div ref={observerRef} className="h-8 flex items-center justify-center">
+                  {loading ? (
+                    <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
+                      Loading more...
+                    </span>
+                  ) : (
+                    renderSeparator(true)
+                  )}
                 </div>
               )}
             </div>

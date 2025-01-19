@@ -20,10 +20,11 @@ interface Repository {
   description: string | null
   private: boolean
   stargazers_count: number
+  category?: 'exact' | 'owned' | null
 }
 
 interface SearchResult extends Repository {
-  category?: 'exact' | 'owned' | 'favorited' | null
+  category?: 'exact' | 'owned' | null
 }
 
 interface RecentSearch {
@@ -73,6 +74,43 @@ const saveRecentSearches = (searches: RecentSearch[]) => {
   }
 }
 
+interface GitHubSearchResponse {
+  items: Repository[]
+  nextPage: number | null
+  total: number
+}
+
+interface GitHubAPIResponse {
+  total_count: number
+  items: GitHubRepository[]
+  incomplete_results: boolean
+}
+
+interface GitHubRepository {
+  id: number
+  name: string
+  owner: {
+    login: string
+  }
+  description: string | null
+  visibility: string
+  stargazers_count: number
+  full_name: string
+  html_url: string
+  language: string | null
+}
+
+// Helper function to convert GitHub API response to our Repository type
+const mapGitHubRepository = (repo: GitHubRepository, category?: 'exact' | 'owned' | null): Repository => ({
+  id: repo.id,
+  name: repo.name,
+  owner: { login: repo.owner.login },
+  description: repo.description,
+  private: repo.visibility === 'private',
+  stargazers_count: repo.stargazers_count,
+  category
+});
+
 export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState('');
   const [displayedPages, setDisplayedPages] = useState(1);
@@ -83,6 +121,26 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const { user } = getAuthState();
   const { favorites } = useFavorites();
   const queryClient = useQueryClient();
+
+  // Debug log user metadata
+  useEffect(() => {
+    if (user) {
+      console.log('User Metadata:', {
+        user_metadata: user.user_metadata,
+        app_metadata: user.app_metadata,
+        email: user.email
+      });
+    }
+  }, [user]);
+
+  // Update owner check logic
+  const getUserName = () => {
+    if (!user) return null;
+    return user.user_metadata?.preferred_username ||
+      user.user_metadata?.user_name ||
+      user.user_metadata?.username ||
+      user.user_metadata?.login;
+  };
 
   // Clear results when query is empty
   useEffect(() => {
@@ -114,14 +172,14 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const {
     data,
     isLoading,
-    hasNextPage: hasNextAPIPage,
-    fetchNextPage: fetchNextAPIPage,
   } = useInfiniteQuery({
     queryKey: ['search', debouncedQuery],
-    queryFn: async ({ pageParam = 1 }) => {
-      if (!debouncedQuery || debouncedQuery.length < 3) return { items: [], nextPage: null }
+    queryFn: async ({ pageParam = 1 }): Promise<GitHubSearchResponse> => {
+      if (!debouncedQuery || debouncedQuery.length < 3) {
+        return { items: [], nextPage: null, total: 0 } as GitHubSearchResponse;
+      }
 
-      console.log('Starting repository search:', { query: debouncedQuery, page: pageParam })
+      console.log('Starting repository search:', { query: debouncedQuery })
 
       return withGitHub(async (client) => {
         try {
@@ -130,187 +188,123 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
           let searchQuery
           let response
 
-          if (repoMatch && pageParam === 1) {
-            // Only try exact match on first page
-            searchQuery = `repo:${repoMatch[1]}/${repoMatch[2]}`
-            console.log('Searching for specific repository:', searchQuery)
-
+          if (repoMatch) {
+            // Try exact match first
             try {
               const exactRepo = await client.getRepository(repoMatch[1], repoMatch[2]);
+              return {
+                items: [mapGitHubRepository(exactRepo, 'exact')],
+                nextPage: null,
+                total: 1
+              } as GitHubSearchResponse;
+            } catch (error) {
+              console.log('Exact repository not found, falling back to search');
+            }
+          }
+
+          // For general searches
+          searchQuery = `${debouncedQuery} in:name in:description is:public fork:true`
+
+          // If we have a user, first try to find their repositories
+          if (user) {
+            try {
+              // Try user's repositories
+              const userRepoQuery = `user:${user.user_metadata.user_name} ${debouncedQuery} in:name`;
+              console.log('Searching user repositories:', userRepoQuery);
+
+              const userRepos = await client.searchRepositories({
+                query: userRepoQuery,
+                per_page: 5,
+                sort: 'updated',
+                order: 'desc'
+              });
+
+              // Get general search results
+              const generalSearch = await client.searchRepositories({
+                query: searchQuery,
+                per_page: RESULTS_PER_API_CALL,
+                sort: 'stars',
+                order: 'desc'
+              });
+
+              // Combine results, removing duplicates
+              const userRepoIds = new Set(userRepos.items.map(repo => repo.id));
+              const filteredGeneralResults = generalSearch.items
+                .filter(repo => !userRepoIds.has(repo.id))
+                .slice(0, RESULTS_PER_API_CALL - userRepos.items.length);
+
               response = {
-                total_count: 1,
-                items: [{ ...exactRepo, category: 'exact' }], // Mark as exact match
+                total_count: userRepos.total_count + generalSearch.total_count,
+                items: [...userRepos.items, ...filteredGeneralResults],
                 incomplete_results: false
               };
             } catch (error) {
-              console.log('Exact repository not found, falling back to search');
+              console.error('Error searching user repositories:', error);
+              // Fall back to general search
               response = await client.searchRepositories({
-                query: `${searchQuery} fork:true`,
+                query: searchQuery,
                 per_page: RESULTS_PER_API_CALL,
-                page: pageParam,
                 sort: 'stars',
                 order: 'desc'
               });
             }
           } else {
-            // For general searches
-            searchQuery = `${debouncedQuery} in:name in:description is:public fork:true`
-
-            // If we have a user, first try to find their repositories
-            if (user && pageParam === 1) {
-              try {
-                const userRepoQuery = `user:${user.user_metadata.user_name} ${debouncedQuery} in:name`;
-                console.log('Searching user repositories:', userRepoQuery);
-
-                const userRepos = await client.searchRepositories({
-                  query: userRepoQuery,
-                  per_page: 5,
-                  sort: 'updated',
-                  order: 'desc'
-                });
-
-                // If user has matching repos, combine them with general search
-                if (userRepos.items.length > 0) {
-                  const generalSearch = await client.searchRepositories({
-                    query: searchQuery,
-                    per_page: RESULTS_PER_API_CALL,
-                    page: pageParam,
-                    sort: 'stars',
-                    order: 'desc'
-                  });
-
-                  // Combine results, removing duplicates
-                  const userRepoIds = new Set(userRepos.items.map(repo => repo.id));
-                  const filteredGeneralResults = generalSearch.items.filter(repo => !userRepoIds.has(repo.id));
-
-                  response = {
-                    total_count: userRepos.total_count + generalSearch.total_count,
-                    items: [...userRepos.items, ...filteredGeneralResults],
-                    incomplete_results: false
-                  };
-                } else {
-                  // If no user repos found, fall back to general search
-                  response = await client.searchRepositories({
-                    query: searchQuery,
-                    per_page: RESULTS_PER_API_CALL,
-                    page: pageParam,
-                    sort: 'stars',
-                    order: 'desc'
-                  });
-                }
-              } catch (error) {
-                console.error('Error searching user repositories:', error);
-                // Fall back to general search on error
-                response = await client.searchRepositories({
-                  query: searchQuery,
-                  per_page: RESULTS_PER_API_CALL,
-                  page: pageParam,
-                  sort: 'stars',
-                  order: 'desc'
-                });
-              }
-            } else {
-              // Regular search for subsequent pages or when no user
-              response = await client.searchRepositories({
-                query: searchQuery,
-                per_page: RESULTS_PER_API_CALL,
-                page: pageParam,
-                sort: 'stars',
-                order: 'desc'
-              });
-            }
+            // Regular search when no user
+            response = await client.searchRepositories({
+              query: searchQuery,
+              per_page: RESULTS_PER_API_CALL,
+              sort: 'stars',
+              order: 'desc'
+            });
           }
 
           // Sort and categorize results
           const sortedResults = response.items.map(item => {
-            const result = item as SearchResult;
+            const result = mapGitHubRepository(item);
+            const repoOwner = result.owner.login.toLowerCase();
+            const userName = getUserName()?.toLowerCase();
 
-            // Keep exact match category if already set
-            if (result.category === 'exact') {
+            // Check if user owns the repository
+            if (userName && userName === repoOwner) {
+              result.category = 'owned';
               return result;
             }
 
-            const repoOwner = result.owner.login.toLowerCase();
-            const userName = user?.user_metadata.user_name?.toLowerCase() || '';
-
-            // Check if this is an exact match for owner/repo format search
-            if (repoMatch &&
-              repoMatch[1].toLowerCase() === repoOwner &&
-              repoMatch[2].toLowerCase() === result.name.toLowerCase()) {
-              result.category = 'exact';
-              console.log(`✓ Categorized as exact match: ${result.owner.login}/${result.name}`);
-            }
-            // Check if user owns the repository
-            else if (user?.user_metadata.user_name && repoOwner === userName) {
-              result.category = 'owned';
-              console.log(`✓ Categorized as owned: ${result.owner.login}/${result.name}`);
-            }
-            // Check if repository is favorited
-            else if (favorites?.some(fav =>
-              fav.owner.toLowerCase() === repoOwner &&
-              fav.name.toLowerCase() === result.name.toLowerCase()
-            )) {
-              result.category = 'favorited';
-              console.log(`✓ Categorized as favorited: ${result.owner.login}/${result.name}`);
-            } else {
-              result.category = null;
-              console.log(`- Categorized as other: ${result.owner.login}/${result.name}`);
-            }
-
+            // If no other category applies, set to null
+            result.category = null;
             return result;
           }).sort((a, b) => {
-            // Exact matches get highest priority
-            if (a.category === 'exact' && b.category !== 'exact') return -1;
-            if (a.category !== 'exact' && b.category === 'exact') return 1;
-
-            // Owned repositories get second priority
+            // Owned repositories get highest priority
             if (a.category === 'owned' && b.category !== 'owned') return -1;
             if (a.category !== 'owned' && b.category === 'owned') return 1;
-
-            // Favorited repositories get third priority
-            if (a.category === 'favorited' && b.category !== 'favorited') return -1;
-            if (a.category !== 'favorited' && b.category === 'favorited') return 1;
 
             // For repositories in the same category, sort by stars
             return b.stargazers_count - a.stargazers_count;
           });
 
-          // Debug log the final sorted results
-          console.log('Final categorized results:', sortedResults.map(r => ({
-            repo: `${r.owner.login}/${r.name}`,
-            category: r.category
-          })));
-
-          // Calculate next page
-          const hasMore = !response.incomplete_results &&
-            response.total_count > pageParam * RESULTS_PER_API_CALL;
-          const nextPage = hasMore ? pageParam + 1 : null;
-
           return {
             items: sortedResults,
-            nextPage,
+            nextPage: null,
             total: response.total_count
-          };
+          } as GitHubSearchResponse;
         } catch (error) {
           console.error('Error during repository search:', error)
           throw error
         }
-      })
+      }) as Promise<GitHubSearchResponse>
     },
-    getNextPageParam: (lastPage) => lastPage.nextPage,
+    getNextPageParam: () => null,
     enabled: !!debouncedQuery && debouncedQuery.length >= 3,
     staleTime: 5 * 60 * 1000,
     retry: 1,
-    keepPreviousData: true,
-    cacheTime: 5 * 60 * 1000,
-    // Reset the cache when the query changes
-    gcTime: 0
+    gcTime: 0,
+    initialPageParam: 1
   });
 
   // Get all fetched results
   const allResults = data?.pages.flatMap(page => page.items) ?? [];
 
-  // Calculate if we need to show more results from our cache or fetch more from API
+  // Calculate if we need to show more results from our cache
   const totalFetchedResults = allResults.length;
   const displayedResults = allResults.slice(0, displayedPages * RESULTS_PER_PAGE);
   const hasMoreCachedResults = totalFetchedResults > displayedResults.length;
@@ -319,9 +313,6 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     if (hasMoreCachedResults) {
       // If we have more results in cache, just show more
       setDisplayedPages(prev => prev + 1);
-    } else if (hasNextAPIPage) {
-      // If we need more results, fetch from API
-      await fetchNextAPIPage();
     }
   };
 
@@ -356,7 +347,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         setQuery,
         results: displayedResults,
         loading: isLoading,
-        hasNextPage: hasMoreCachedResults || hasNextAPIPage,
+        hasNextPage: hasMoreCachedResults,
         fetchNextPage,
         handleRepositorySelect,
         recentSearches,

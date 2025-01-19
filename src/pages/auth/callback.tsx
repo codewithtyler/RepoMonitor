@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { redirect } from 'react-router-dom';
+import { redirect, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/auth/supabase-client';
 import { GitHubTokenManager } from '../../lib/auth/github-token-manager';
 import { useUser } from '../../lib/auth/hooks';
@@ -25,6 +25,8 @@ export function AuthCallback() {
   const { user, loading } = useUser();
   const [status, setStatus] = useState<string>('Initializing...');
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -42,8 +44,11 @@ export function AuthCallback() {
           console.log('[Auth] No user found');
           setStatus('No user found, redirecting...');
           setError('Authentication failed - no user found');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          window.location.href = '/';
+          if (!redirectAttempted) {
+            setRedirectAttempted(true);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            navigate('/', { replace: true });
+          }
           return;
         }
 
@@ -65,8 +70,11 @@ export function AuthCallback() {
           console.error('[Auth] No provider token in session');
           setStatus('Missing provider token...');
           setError('No GitHub access token found');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          window.location.href = '/';
+          if (!redirectAttempted) {
+            setRedirectAttempted(true);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            navigate('/', { replace: true });
+          }
           return;
         }
 
@@ -77,20 +85,26 @@ export function AuthCallback() {
         setStatus('Success! Redirecting to dashboard...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         // Redirect back to the local dashboard
-        window.location.href = `${window.location.origin}/dashboard`;
+        if (!redirectAttempted) {
+          setRedirectAttempted(true);
+          navigate('/dashboard', { replace: true });
+        }
       } catch (err) {
         console.error('[Auth] Error in callback:', err);
         setStatus('Error occurred during authentication');
         setError(err instanceof Error ? err.message : 'Unknown error occurred');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        window.location.href = '/';
+        if (!redirectAttempted) {
+          setRedirectAttempted(true);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          navigate('/', { replace: true });
+        }
       }
     };
 
-    if (!loading) {
+    if (!loading && !redirectAttempted) {
       handleCallback();
     }
-  }, [user, loading]);
+  }, [user, loading, navigate, redirectAttempted]);
 
   return (
     <div
