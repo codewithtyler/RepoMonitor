@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Navigate } from 'react-router-dom';
 import { LoadingSpinner } from '../common/loading-spinner';
 import { useEffect, useState } from 'react';
-import { subscribeToAuth, getAuthState } from '../../lib/auth/global-state';
+import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -14,11 +14,20 @@ import { subscribeToAuth, getAuthState } from '../../lib/auth/global-state';
 // to prevent multiple Supabase requests across components.
 // This ensures all components share the same auth state.
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState(getAuthState());
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+}
+
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const [state, setState] = useState<AuthState>({
+    session: null,
+    user: null,
+    loading: true
+  });
 
   useEffect(() => {
-    return subscribeToAuth(setState);
+    const unsubscribe = subscribeToAuth(setState);
+    return () => unsubscribe();
   }, []);
 
   if (state.loading) {
@@ -30,7 +39,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!state.user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" />;
   }
 
   return <>{children}</>;

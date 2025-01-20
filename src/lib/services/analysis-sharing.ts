@@ -19,10 +19,10 @@ export class AnalysisSharingService {
 
   async checkRepositoryAccess(owner: string, repo: string) {
     const githubClient = await getGitHubClient(this.userId);
-    const access = await githubClient.checkRepositoryAccess(owner, repo);
+    const repository = await githubClient.getRepository(owner, repo);
 
     // Get or create repository record
-    const { data: repository, error: repoError } = await supabase
+    const { data: existingRepo, error: repoError } = await supabase
       .from('repositories')
       .select('id')
       .eq('full_name', `${owner}/${repo}`)
@@ -33,13 +33,17 @@ export class AnalysisSharingService {
     }
 
     let repositoryId: number;
-    if (!repository) {
+    if (!existingRepo) {
       const { data: newRepo, error: createError } = await supabase
         .from('repositories')
         .insert({
           full_name: `${owner}/${repo}`,
-          is_public: !access.isPrivate,
-          repository_permissions: access.permissions
+          is_public: repository.visibility === 'public',
+          repository_permissions: {
+            admin: repository.permissions?.admin ?? false,
+            push: repository.permissions?.push ?? false,
+            pull: repository.permissions?.pull ?? false
+          }
         })
         .select('id')
         .single();
@@ -47,19 +51,23 @@ export class AnalysisSharingService {
       if (createError) throw createError;
       repositoryId = newRepo.id;
     } else {
-      repositoryId = repository.id;
+      repositoryId = existingRepo.id;
     }
 
     // Update permissions cache
     await supabase.rpc('update_repository_permissions', {
       p_user_id: this.userId,
       p_repository_id: repositoryId,
-      p_permissions: access.permissions
+      p_permissions: {
+        admin: repository.permissions?.admin ?? false,
+        push: repository.permissions?.push ?? false,
+        pull: repository.permissions?.pull ?? false
+      }
     });
 
     return {
-      hasAccess: access.hasAccess,
-      isPublic: !access.isPrivate,
+      hasAccess: repository.permissions?.pull ?? false,
+      isPublic: repository.visibility === 'public',
       repositoryId
     };
   }

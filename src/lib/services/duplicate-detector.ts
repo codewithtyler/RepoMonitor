@@ -1,6 +1,6 @@
 // deno-lint-ignore-file
 import { supabase } from '../auth/supabase-client';
-import { openai } from '../openai';
+import { openaiClient } from '../openai';
 
 interface Issue {
   id: number;
@@ -33,13 +33,13 @@ export class DuplicateDetector {
       issue.description || '',
       ...issue.labels
     ];
-    return openai.preprocessText(parts.join(' '));
+    return openaiClient.preprocessText(parts.join(' '));
   }
 
   async processIssues(issues: Issue[]): Promise<void> {
     // Generate embeddings for all issues
     const texts = issues.map(issue => this.combineText(issue));
-    const embeddings = await openai.createEmbeddings(texts);
+    const embeddings = await openaiClient.createEmbeddings(texts);
 
     // Store issues and embeddings
     for (let i = 0; i < issues.length; i++) {

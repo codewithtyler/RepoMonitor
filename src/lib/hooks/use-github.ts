@@ -3,12 +3,41 @@ import { getGitHubClient } from '../github';
 import type { GitHubClient } from '@/lib/github';
 import { toast } from 'sonner';
 import { getAuthState, subscribeToAuth } from '../auth/global-state';
+import { useQuery } from '@tanstack/react-query';
 
 // Using getAuthState() from global-state instead of useUser() hook
 // to prevent multiple Supabase requests across components.
 // This ensures all components share the same auth state.
 
 export function useGitHub() {
+  return useQuery({
+    queryKey: ['github'],
+    queryFn: async () => {
+      const state = await getAuthState();
+      if (!state.user) {
+        throw new Error('User must be authenticated');
+      }
+
+      const client = await getGitHubClient(state.user.id);
+      return client;
+    }
+  });
+}
+
+export function useGitHubUser() {
+  return useQuery({
+    queryKey: ['github-user'],
+    queryFn: async () => {
+      const state = await getAuthState();
+      if (!state.user) {
+        throw new Error('User must be authenticated');
+      }
+      return state.user;
+    }
+  });
+}
+
+export function useGitHubOld() {
   const clientRef = useRef<GitHubClient | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const initAttempted = useRef(false);
@@ -19,17 +48,15 @@ export function useGitHub() {
     let unsubscribe: (() => void) | undefined;
 
     const initialize = async () => {
-      // Don't initialize if already initializing or already attempted
       if (!mounted || initAttempted.current) {
         return;
       }
 
-      const { user } = getAuthState();
-      if (!user) {
+      const state = await getAuthState();
+      if (!state.user) {
         return;
       }
 
-      // Skip initialization on homepage
       if (window.location.pathname === '/') {
         return;
       }
@@ -37,13 +64,11 @@ export function useGitHub() {
       try {
         setIsInitializing(true);
         initAttempted.current = true;
-        clientRef.current = await getGitHubClient(user.id);
+        clientRef.current = await getGitHubClient(state.user.id);
       } catch (error) {
         console.error('Failed to initialize GitHub client:', error);
         clientRef.current = null;
 
-        // Only show error and redirect if we're not on the homepage or callback page
-        // and haven't attempted a redirect yet
         if (mounted &&
           window.location.pathname !== '/' &&
           !window.location.pathname.includes('/auth/callback') &&
@@ -59,21 +84,16 @@ export function useGitHub() {
       }
     };
 
-    // Subscribe to auth changes
-    unsubscribe = subscribeToAuth((state) => {
-      // Only attempt initialization if we have a user and haven't tried before
-      // and we're not on the homepage
+    unsubscribe = subscribeToAuth(async (state) => {
       if (state.user && !initAttempted.current && !isInitializing && window.location.pathname !== '/') {
-        initialize();
+        await initialize();
       } else if (!state.user) {
-        // Reset state when user logs out
         clientRef.current = null;
         initAttempted.current = false;
         redirectAttempted.current = false;
       }
     });
 
-    // Initial initialization attempt (skip on homepage)
     if (window.location.pathname !== '/') {
       initialize();
     }
@@ -90,14 +110,13 @@ export function useGitHub() {
   }, []);
 
   const withGitHub = useCallback(async <T>(fn: (client: GitHubClient) => Promise<T>): Promise<T | null> => {
-    // Skip GitHub operations on homepage
     if (window.location.pathname === '/') {
       return null;
     }
 
-    const { user } = getAuthState();
+    const state = await getAuthState();
 
-    if (!user) {
+    if (!state.user) {
       if (!redirectAttempted.current && !window.location.pathname.includes('/auth/callback')) {
         redirectAttempted.current = true;
         toast.error('Authentication required');
@@ -118,8 +137,6 @@ export function useGitHub() {
     } catch (error) {
       console.error('GitHub API error:', error);
 
-      // Only show error and redirect if we're not on the homepage or callback page
-      // and haven't attempted a redirect yet
       if (!redirectAttempted.current &&
         window.location.pathname !== '/' &&
         !window.location.pathname.includes('/auth/callback')) {

@@ -32,6 +32,13 @@ export interface GitHubRepository {
     push: boolean;
     pull: boolean;
   };
+  topics?: string[];
+  size?: number;
+  has_issues?: boolean;
+  archived?: boolean;
+  disabled?: boolean;
+  subscribers_count?: number;
+  is_private?: boolean;
 }
 
 export interface SearchOptions {
@@ -50,7 +57,8 @@ export interface SearchResponse {
 
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<GitHubRepository>;
-  searchRepositories(options: SearchOptions): Promise<SearchResponse>;
+  searchRepositories(query: string): Promise<SearchResponse>;
+  listRepositories(): Promise<GitHubRepository[]>;
   listRepositoryIssues(owner: string, repo: string, options?: {
     state?: 'open' | 'closed' | 'all';
     per_page?: number;
@@ -124,26 +132,30 @@ class GitHubClientImpl implements GitHubClient {
     return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
-  async searchRepositories(options: SearchOptions): Promise<SearchResponse> {
-    const {
-      query,
-      page = 1,
-      per_page = 10,
-      sort = 'stars',
-      order = 'desc'
-    } = options;
-
-    console.log('Searching repositories:', { query, page, per_page, sort, order });
+  async searchRepositories(query: string): Promise<SearchResponse> {
+    console.log('Searching repositories:', { query });
 
     const params = new URLSearchParams({
       q: query,
-      page: page.toString(),
-      per_page: per_page.toString(),
-      sort,
-      order
+      page: '1',
+      per_page: '10',
+      sort: 'stars',
+      order: 'desc'
     });
 
     return this.request<SearchResponse>(`/search/repositories?${params}`);
+  }
+
+  async listRepositories(): Promise<GitHubRepository[]> {
+    const params = new URLSearchParams({
+      type: 'all',
+      sort: 'created',
+      direction: 'asc',
+      per_page: '100',
+      page: '1'
+    });
+
+    return this.request<GitHubRepository[]>(`/user/repos?${params}`);
   }
 
   async listRepositoryIssues(owner: string, repo: string, options: {

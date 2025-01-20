@@ -1,103 +1,153 @@
-import { GitHubRepository } from '@/lib/github';
-import { Loader2, Star, GitFork, AlertCircle } from 'lucide-react';
 import { theme } from '@/config/theme';
+import { SearchResult } from '@/lib/contexts/search-context';
 
 interface SearchResultsDropdownProps {
-  results: GitHubRepository[];
-  isLoading: boolean;
+  query: string;
+  results: SearchResult[];
+  loading: boolean;
   error: Error | null;
-  hasMore: boolean;
-  onLoadMore: () => void;
-  onSelect: (result: GitHubRepository) => Promise<void>;
+  recentSearches: SearchResult[];
+  onSelect: (repository: { owner: string; name: string }) => void;
+  onRemoveRecentSearch: (id: number) => void;
 }
 
 export function SearchResultsDropdown({
+  query,
   results,
-  isLoading,
+  loading,
   error,
-  hasMore,
-  onLoadMore,
-  onSelect
+  recentSearches,
+  onSelect,
+  onRemoveRecentSearch
 }: SearchResultsDropdownProps) {
-  if (!isLoading && !error && results.length === 0) {
+  if (loading) {
+    return (
+      <div
+        className="p-2 rounded-lg shadow-lg border"
+        style={{
+          backgroundColor: theme.colors.background.secondary,
+          borderColor: theme.colors.border.primary
+        }}
+      >
+        <div className="text-sm text-center py-2" style={{ color: theme.colors.text.secondary }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className="p-2 rounded-lg shadow-lg border"
+        style={{
+          backgroundColor: theme.colors.background.secondary,
+          borderColor: theme.colors.border.primary
+        }}
+      >
+        <div className="text-sm text-center py-2" style={{ color: theme.colors.error.primary }}>
+          {error.message}
+        </div>
+      </div>
+    );
+  }
+
+  if (!query && recentSearches.length === 0) {
     return null;
   }
 
+  const displayResults = query ? results : recentSearches;
+
+  if (query && displayResults.length === 0) {
+    return (
+      <div
+        className="p-2 rounded-lg shadow-lg border"
+        style={{
+          backgroundColor: theme.colors.background.secondary,
+          borderColor: theme.colors.border.primary
+        }}
+      >
+        <div className="text-sm text-center py-2" style={{ color: theme.colors.text.secondary }}>
+          No results found
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="absolute z-50 w-full mt-1 bg-white rounded-md shadow-lg border"
+    <div
+      className="rounded-lg shadow-lg border"
       style={{
         backgroundColor: theme.colors.background.secondary,
         borderColor: theme.colors.border.primary
-      }}>
-      {error && (
-        <div className="p-4 text-sm text-red-500 flex items-center gap-2">
-          <AlertCircle className="h-4 w-4" />
-          <span>Error: {error.message}</span>
+      }}
+    >
+      {!query && (
+        <div className="p-2 border-b" style={{ borderColor: theme.colors.border.primary }}>
+          <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
+            Recent Searches
+          </div>
         </div>
       )}
-
-      {isLoading && results.length === 0 && (
-        <div className="p-4 text-sm flex items-center justify-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Searching repositories...</span>
-        </div>
-      )}
-
-      {results.map((result) => (
-        <button
-          key={result.id}
-          onClick={() => onSelect(result)}
-          className="w-full p-3 text-left hover:bg-gray-100 flex flex-col gap-1 border-b last:border-b-0"
-          style={{
-            borderColor: theme.colors.border.primary,
-            '&:hover': {
-              backgroundColor: theme.colors.background.hover
-            }
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="font-medium">{result.full_name}</span>
-            <span className="text-xs px-2 py-1 rounded-full bg-gray-100">
-              {result.visibility}
-            </span>
+      <div className="p-1">
+        {displayResults.map(result => (
+          <div
+            key={result.id}
+            className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-500/10 cursor-pointer"
+            onClick={() => onSelect({ owner: result.owner, name: result.name })}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium truncate" style={{ color: theme.colors.text.primary }}>
+                  {result.owner}/{result.name}
+                </span>
+                {result.visibility === 'private' && (
+                  <span
+                    className="px-1.5 py-0.5 text-xs rounded-full"
+                    style={{
+                      backgroundColor: theme.colors.background.primary,
+                      color: theme.colors.text.secondary
+                    }}
+                  >
+                    Private
+                  </span>
+                )}
+              </div>
+              {result.description && (
+                <div
+                  className="text-sm truncate mt-0.5"
+                  style={{ color: theme.colors.text.secondary }}
+                >
+                  {result.description}
+                </div>
+              )}
+              <div className="flex items-center gap-4 mt-1">
+                <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
+                  ★ {result.stargazersCount.toLocaleString()}
+                </span>
+                <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
+                  🔀 {result.forksCount.toLocaleString()}
+                </span>
+                <span className="text-xs" style={{ color: theme.colors.text.secondary }}>
+                  ⚠️ {result.openIssuesCount.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            {!query && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onRemoveRecentSearch(result.id);
+                }}
+                className="p-1 rounded-full hover:bg-gray-500/20"
+                style={{ color: theme.colors.text.secondary }}
+              >
+                ×
+              </button>
+            )}
           </div>
-          {result.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">{result.description}</p>
-          )}
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <span className="flex items-center gap-1">
-              <Star className="h-4 w-4" />
-              {result.stargazers_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <GitFork className="h-4 w-4" />
-              {result.forks_count}
-            </span>
-          </div>
-        </button>
-      ))}
-
-      {hasMore && (
-        <button
-          onClick={onLoadMore}
-          className="w-full p-2 text-sm text-center hover:bg-gray-100 border-t"
-          style={{
-            borderColor: theme.colors.border.primary,
-            '&:hover': {
-              backgroundColor: theme.colors.background.hover
-            }
-          }}
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading more...
-            </span>
-          ) : (
-            'Load more results'
-          )}
-        </button>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
