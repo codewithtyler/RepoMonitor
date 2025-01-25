@@ -6,7 +6,7 @@ import { theme } from '@/config/theme';
 // All components are built from scratch using TailwindCSS for styling.
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'outline';
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -22,15 +22,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         default: theme.colors.background.secondary,
         hover: theme.colors.background.secondary + 'dd',
         disabled: theme.colors.background.secondary + '99'
+      },
+      outline: {
+        default: 'transparent',
+        hover: theme.colors.background.secondary + '33',
+        disabled: 'transparent'
       }
     };
 
     const styles = variantStyles[variant];
+    const isOutline = variant === 'outline';
 
     return (
       <button
         ref={ref}
-        className={`${baseStyles} ${className}`}
+        className={`${baseStyles} ${isOutline ? 'border border-gray-300' : ''} ${className}`}
         disabled={disabled}
         style={{
           backgroundColor: disabled ? styles.disabled : styles.default,
@@ -55,3 +61,5 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     );
   }
 );
+
+Button.displayName = 'Button';

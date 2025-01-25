@@ -4,16 +4,32 @@ import { AuthCallback } from '../pages/auth/callback';
 import { Home } from '../pages/Home';
 import { Repository } from '../pages/Repository';
 import { AnalyzePage } from '../pages/analyze/[owner]/[repo]';
-import { getAuthState, subscribeToAuth } from '../lib/auth/global-state';
+import { getAuthState, subscribeToAuth, type AuthState } from '../lib/auth/global-state';
 import { useEffect, useState } from 'react';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   console.log('[ProtectedRoute] Component mounting');
-  const [state, setState] = useState(getAuthState());
+  const [state, setState] = useState<AuthState>({ loading: true, user: null, session: null });
 
   useEffect(() => {
     console.log('[ProtectedRoute] Setting up auth subscription');
-    return subscribeToAuth(setState);
+    let unsubscribe: (() => void) | undefined;
+
+    const initAuth = async () => {
+      const initialState = await getAuthState();
+      setState(initialState);
+      unsubscribe = subscribeToAuth((newState) => {
+        setState(newState);
+      });
+    };
+
+    initAuth();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   console.log('[ProtectedRoute] State:', { loading: state.loading, hasUser: !!state.user, userId: state.user?.id });

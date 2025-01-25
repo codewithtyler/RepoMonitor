@@ -1,20 +1,15 @@
-import { useRepositoriesData } from '@/lib/hooks/use-repository-data';
-import { Repository } from '@/types/repository';
+import { type Repository } from '@/lib/hooks/use-repository-data';
+import { theme } from '@/config/theme';
 
 interface RepositoryListProps {
     repositories: Repository[];
+    onSelect?: (repository: Repository) => void;
 }
 
-export function RepositoryList({ repositories }: RepositoryListProps) {
-    const { refreshRepositoryData } = useRepositoriesData();
-
-    const handleRepositoryClick = async (repository: Repository) => {
+export function RepositoryList({ repositories, onSelect }: RepositoryListProps) {
+    const handleRepositoryClick = (repository: Repository) => {
         console.log('[RepositoryList] Repository clicked:', repository.owner, repository.name);
-        try {
-            await refreshRepositoryData(repository.owner, repository.name);
-        } catch (error) {
-            console.error('[RepositoryList] Error refreshing repository data:', error);
-        }
+        onSelect?.(repository);
     };
 
     return (
@@ -23,24 +18,28 @@ export function RepositoryList({ repositories }: RepositoryListProps) {
                 <button
                     key={repository.id}
                     onClick={() => handleRepositoryClick(repository)}
-                    className="flex items-center justify-between p-4 bg-white rounded-lg shadow hover:shadow-md transition-shadow"
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-gray-500/5"
+                    style={{
+                        backgroundColor: theme.colors.background.secondary,
+                        borderColor: theme.colors.border.primary
+                    }}
                 >
                     <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-900">
+                        <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
                             {repository.owner}/{repository.name}
                         </span>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm" style={{ color: theme.colors.text.secondary }}>
                             {repository.description || 'No description'}
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
                             ⭐ {repository.stargazersCount}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
                             🔄 {repository.forksCount}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
                             ⚠️ {repository.openIssuesCount}
                         </div>
                     </div>

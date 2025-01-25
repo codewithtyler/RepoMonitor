@@ -9,8 +9,12 @@ export function Home() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          scopes: 'repo read:user'
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'repo read:user',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
         }
       });
 

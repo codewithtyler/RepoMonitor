@@ -36,12 +36,8 @@ export class GitHubTokenManager {
     }
     lastTokenUpdate = now;
 
-    // Clean and validate token
+    // Clean token
     const cleanToken = token.trim().replace(/\s+/g, '');
-    if (!cleanToken.startsWith('gho_')) {
-      console.error('[GitHubTokenManager] Invalid token format:', cleanToken.substring(0, 4));
-      throw new Error('Invalid token format: must start with gho_');
-    }
 
     // Validate token with GitHub API
     const isValid = await this.validateToken(cleanToken);
@@ -58,72 +54,94 @@ export class GitHubTokenManager {
       scopes: ['repo', 'read:user']
     };
 
-    // Store raw token in localStorage
+    // Store token in localStorage for quick access
     localStorage.setItem(TOKEN_STORAGE_KEY, cleanToken);
 
-    // Store encrypted token in database
-    const { error: updateError } = await supabase
-      .from('github_tokens')
-      .upsert({
-        user_id: userId,
-        token: cleanToken, // This will be encrypted by the database trigger
-        expires_at: tokenData.expires_at,
-        scopes: tokenData.scopes,
-        last_refresh: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
-      });
+    try {
+      // Store token in database - it will be encrypted by the trigger
+      const { error: updateError } = await supabase
+        .from('github_tokens')
+        .upsert({
+          user_id: userId,
+          token: cleanToken,
+          expires_at: tokenData.expires_at,
+          scopes: tokenData.scopes,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
 
-    if (updateError) {
-      console.error('[GitHubTokenManager] Failed to store token:', updateError);
-      throw new Error('Failed to store GitHub token');
+      if (updateError) {
+        console.error('[GitHubTokenManager] Failed to store token:', updateError);
+        throw updateError;
+      }
+
+      console.log('[GitHubTokenManager] Token stored successfully');
+      return cleanToken;
+    } catch (error) {
+      console.error('[GitHubTokenManager] Database error storing token:', error);
+      // Still return the token even if DB storage fails
+      return cleanToken;
     }
-
-    console.log('[GitHubTokenManager] Token stored successfully');
-    return cleanToken;
   }
 
   static async getToken(): Promise<string> {
     try {
-      // Try localStorage first
-      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-      if (storedToken) {
-        // Validate the token
-        if (await this.validateToken(storedToken)) {
-          return storedToken;
-        }
-      }
-
-      // If not in localStorage or invalid, try to get from Supabase
+      // First try to get the session token
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.provider_token) {
-        // We have a fresh token from OAuth, store and return it
-        const token = await this.handleOAuthToken(session.provider_token, session.user.id);
-        return token;
+      if (!session?.user) {
+        throw new Error('No authenticated user');
       }
 
-      // If we're on the callback page, wait a bit for the token to be processed
-      if (window.location.pathname === '/auth/callback') {
-        console.log('[GitHubTokenManager] On callback page, waiting for token...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        const newStoredToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-        if (newStoredToken && await this.validateToken(newStoredToken)) {
-          return newStoredToken;
-        }
+      // If we have a provider token from the session, use and store it
+      if (session.provider_token) {
+        console.log('[GitHubTokenManager] Found provider token in session');
+        return this.handleOAuthToken(session.provider_token, session.user.id);
       }
 
-      // If still no token, clear any invalid tokens and redirect
-      this.clearToken();
-      if (window.location.pathname !== '/auth/callback') {
-        const redirectUrl = new URL('/auth/callback', window.location.origin);
-        window.location.href = redirectUrl.toString();
+      // Try localStorage next for quick access
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (storedToken && await this.validateToken(storedToken)) {
+        console.log('[GitHubTokenManager] Using valid token from localStorage');
+        return storedToken;
+      }
+
+      // Finally, try to get from database
+      const { data: tokenData, error: fetchError } = await supabase
+        .from('github_tokens')
+        .select('token, expires_at')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (fetchError || !tokenData?.token) {
+        console.log('[GitHubTokenManager] No token in database');
+        throw new Error('No token found in database');
+      }
+
+      // Decrypt token using RPC function
+      const { data: decryptedToken, error: decryptError } = await supabase
+        .rpc('decrypt_github_token', {
+          encrypted_token: tokenData.token
+        });
+
+      if (decryptError || !decryptedToken) {
+        console.error('[GitHubTokenManager] Failed to decrypt token:', decryptError);
+        throw new Error('Failed to decrypt token');
+      }
+
+      // Validate the token
+      if (await this.validateToken(decryptedToken)) {
+        console.log('[GitHubTokenManager] Using valid token from database');
+        localStorage.setItem(TOKEN_STORAGE_KEY, decryptedToken);
+        return decryptedToken;
       }
 
       throw new Error('No valid GitHub token found');
     } catch (error) {
       console.error('[GitHubTokenManager] Failed to get token:', error);
       this.clearToken();
-      throw new Error('Failed to get GitHub token');
+      throw error;
     }
   }
 

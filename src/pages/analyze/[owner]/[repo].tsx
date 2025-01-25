@@ -1,19 +1,20 @@
 import { useParams } from 'react-router-dom';
 import { RepositoryAnalysisView } from '@/components/repository/repository-analysis-view';
-import { useUser } from '@/lib/auth/hooks';
 
 export function AnalyzePage() {
-  const { owner, name } = useParams();
-  const { user } = useUser();
+  const { owner, name } = useParams<{ owner: string; name: string }>();
 
-  if (!owner || !name || !user) {
-    return <div>Invalid repository or not logged in</div>;
+  if (!owner || !name) {
+    return (
+      <div className="p-4 text-red-500">
+        Invalid repository URL. Please check the URL and try again.
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">{owner}/{name}</h1>
-      <RepositoryAnalysisView />
+    <div className="p-4">
+      <RepositoryAnalysisView owner={owner} name={name} />
     </div>
   );
 }
