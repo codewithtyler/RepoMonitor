@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearch, type SearchResult } from '@/lib/contexts/search-context';
+import { useRepositorySelection } from '@/lib/hooks/use-repository-selection';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import { theme } from '@/config/theme';
 
@@ -13,6 +14,7 @@ interface Props {
 export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocus }: Props) {
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { handleRepositorySelect } = useRepositorySelection();
   const {
     query,
     setQuery,
@@ -65,6 +67,7 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
     setShowDropdown(false);
     addToRecentSearches(result);
     clearSearch();
+    handleRepositorySelect(result);
   };
 
   const handleSelectRecentSearch = (result: SearchResult) => {
@@ -72,6 +75,7 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
     setQuery(`${result.owner}/${result.name}`);
     setShowDropdown(false);
     search(`${result.owner}/${result.name}`);
+    handleRepositorySelect(result);
   };
 
   const handleFocus = () => {

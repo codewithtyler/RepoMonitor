@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRepositoriesData, type Repository } from '@/lib/hooks/use-repository-data';
 import { GlobalStatsCard } from '@/components/common/global-stats-card';
@@ -7,20 +7,21 @@ import { SearchBar } from '@/components/search/search-bar';
 import { HeaderLogo } from '@/components/layout/header-logo';
 import { NotificationDropdown } from '@/components/common/notification-dropdown';
 import { UserProfile } from '@/components/common/user-profile';
+import { RepositoryDetailView } from '@/components/repository/repository-detail-view';
+import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { theme } from '@/config/theme';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
+  const { selectedRepository } = useAnalysis();
+
+  const recentlyAnalyzed = repositories?.filter(repo => repo.lastAnalysisTimestamp).slice(0, 5) || [];
 
   const filteredRepositories = repositories?.filter(repo => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      repo.name.toLowerCase().includes(searchLower) ||
-      repo.owner.toLowerCase().includes(searchLower) ||
-      (repo.description?.toLowerCase() || '').includes(searchLower)
-    );
+    if (!searchQuery) return true;
+    return `${repo.owner}/${repo.name}`.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const handleRepositorySelect = (repository: Repository) => {
@@ -98,31 +99,22 @@ export function Dashboard() {
     {
       title: 'Total Repositories',
       value: repositories?.length || 0,
-      description: 'Number of repositories you have access to',
-      layoutOrder: 0
-    },
-    {
-      title: 'Analyzed Repositories',
-      value: repositories?.filter(repo => repo.lastAnalysisTimestamp).length || 0,
-      description: 'Number of repositories that have been analyzed',
+      description: 'Total number of repositories',
       layoutOrder: 1
     },
     {
-      title: 'Total Issues',
-      value: repositories?.reduce((sum, repo) => sum + repo.openIssuesCount, 0) || 0,
-      description: 'Total number of open issues across all repositories',
+      title: 'Analyzed Repositories',
+      value: recentlyAnalyzed.length,
+      description: 'Repositories that have been analyzed',
       layoutOrder: 2
+    },
+    {
+      title: 'Active Analysis',
+      value: 0,
+      description: 'Repositories currently being analyzed',
+      layoutOrder: 3
     }
   ];
-
-  const recentlyAnalyzed = repositories
-    ?.filter(repo => repo.lastAnalysisTimestamp)
-    .sort((a, b) => {
-      const dateA = new Date(a.lastAnalysisTimestamp!);
-      const dateB = new Date(b.lastAnalysisTimestamp!);
-      return dateB.getTime() - dateA.getTime();
-    })
-    .slice(0, 5);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.colors.background.primary }}>
@@ -151,9 +143,10 @@ export function Dashboard() {
 
       {/* Main Content */}
       <div className="flex flex-1">
-        {/* Left Sidebar */}
+        {/* Left Sidebar - Always narrow, only shows favorites and recent */}
         <div className="w-64 border-r flex-shrink-0" style={{ borderColor: theme.colors.border.primary }}>
           <div className="p-4 space-y-6">
+            {/* Favorites Section */}
             <div>
               <h2 className="text-sm font-medium mb-3" style={{ color: theme.colors.text.secondary }}>
                 Favorite Repositories
@@ -165,6 +158,7 @@ export function Dashboard() {
               </div>
             </div>
 
+            {/* Recently Analyzed Section */}
             <div>
               <h2 className="text-sm font-medium mb-3" style={{ color: theme.colors.text.secondary }}>
                 Recently Analyzed
@@ -195,24 +189,52 @@ export function Dashboard() {
         {/* Main Content Area */}
         <div className="flex-1 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {stats.map((stat) => (
-                <GlobalStatsCard
-                  key={stat.title}
-                  title={stat.title}
-                  value={stat.value}
-                  description={stat.description}
-                  layoutOrder={stat.layoutOrder}
-                />
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              <RepositoryList
-                repositories={filteredRepositories || []}
-                onSelect={handleRepositorySelect}
+            {selectedRepository ? (
+              <RepositoryDetailView
+                owner={selectedRepository.owner}
+                name={selectedRepository.name}
               />
-            </div>
+            ) : (
+              <>
+                {/* Show global stats in main area when no repo selected */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {stats.map((stat) => (
+                    <GlobalStatsCard
+                      key={stat.title}
+                      title={stat.title}
+                      value={stat.value}
+                      description={stat.description}
+                      layoutOrder={stat.layoutOrder}
+                    />
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <RepositoryList repositories={filteredRepositories || []} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right Panel - Only shows when repo is selected */}
+        <div
+          className={`${selectedRepository ? 'w-80 opacity-100' : 'w-0 opacity-0'} border-l flex-shrink-0 transition-all duration-300 overflow-hidden`}
+          style={{ borderColor: theme.colors.border.primary }}
+        >
+          <div className="p-4 space-y-4">
+            <h2 className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+              Global Stats
+            </h2>
+            {stats.map((stat) => (
+              <GlobalStatsCard
+                key={stat.title}
+                title={stat.title}
+                value={stat.value}
+                description={stat.description}
+                layoutOrder={stat.layoutOrder}
+              />
+            ))}
           </div>
         </div>
       </div>

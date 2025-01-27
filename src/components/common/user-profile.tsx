@@ -43,7 +43,7 @@ export function UserProfile() {
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-500/5 transition-colors"
+        className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-500/5 transition-colors"
       >
         {avatarUrl && (
           <img
@@ -52,42 +52,45 @@ export function UserProfile() {
             className="w-8 h-8 rounded-full"
           />
         )}
+        <span className="text-sm font-medium whitespace-nowrap" style={{ color: theme.colors.text.primary }}>
+          Hey {firstName}
+        </span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
+          style={{ color: theme.colors.text.secondary }}
+        >
+          <path
+            d="M4 6L8 10L12 6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </button>
 
       {showDropdown && (
         <div
-          className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg py-2"
+          className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg py-1"
           style={{ backgroundColor: theme.colors.background.secondary }}
         >
-          <div className="px-4 py-2 border-b" style={{ borderColor: theme.colors.border.primary }}>
-            <div className="flex items-center gap-3">
-              {avatarUrl && (
-                <img
-                  src={avatarUrl}
-                  alt={firstName}
-                  className="w-10 h-10 rounded-full"
-                />
-              )}
-              <div>
-                <div className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>
-                  Hey, {firstName}!
-                </div>
-                <div className="text-xs" style={{ color: theme.colors.text.secondary }}>
-                  {state.user.email}
-                </div>
-              </div>
+          <div className="px-3 py-2 border-b" style={{ borderColor: theme.colors.border.primary }}>
+            <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
+              {state.user.email}
             </div>
           </div>
 
-          <div className="mt-2">
-            <button
-              onClick={handleSignOut}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-500/5 transition-colors"
-              style={{ color: theme.colors.text.primary }}
-            >
-              Sign out
-            </button>
-          </div>
+          <button
+            onClick={handleSignOut}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-500/5 transition-colors"
+            style={{ color: theme.colors.text.primary }}
+          >
+            Sign out
+          </button>
         </div>
       )}
     </div>
