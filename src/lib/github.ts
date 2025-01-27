@@ -57,7 +57,7 @@ export interface SearchResponse {
 
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<GitHubRepository>;
-  searchRepositories(query: string): Promise<SearchResponse>;
+  searchRepositories(query: string, options?: SearchOptions): Promise<SearchResponse>;
   listRepositories(): Promise<GitHubRepository[]>;
   listRepositoryIssues(owner: string, repo: string, options?: {
     state?: 'open' | 'closed' | 'all';
@@ -132,15 +132,15 @@ class GitHubClientImpl implements GitHubClient {
     return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
-  async searchRepositories(query: string): Promise<SearchResponse> {
-    console.log('Searching repositories:', { query });
+  async searchRepositories(query: string, options: SearchOptions = {}): Promise<SearchResponse> {
+    console.log('Searching repositories:', { query, options });
 
     const params = new URLSearchParams({
       q: query,
-      page: '1',
-      per_page: '10',
-      sort: 'stars',
-      order: 'desc'
+      page: (options.page || 1).toString(),
+      per_page: (options.per_page || 10).toString(),
+      sort: options.sort || 'stars',
+      order: options.order || 'desc'
     });
 
     return this.request<SearchResponse>(`/search/repositories?${params}`);
