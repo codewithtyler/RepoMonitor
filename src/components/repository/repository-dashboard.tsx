@@ -5,12 +5,17 @@ import { RepositoryList } from '@/components/repository/repository-list';
 import { SearchBar } from '@/components/search/search-bar';
 import { theme } from '@/config/theme';
 
-export function RepositoryDashboard() {
+interface Props {
+  repositories: Repository[];
+  onSelect: (repository: Repository) => void;
+}
+
+export function RepositoryDashboard({ repositories, onSelect }: Props) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const { data: repositories, isLoading, error } = useRepositoriesData();
+  const { data: repositoriesData, isLoading, error } = useRepositoriesData();
 
-  const filteredRepositories = repositories?.filter(repo => {
+  const filteredRepositories = repositoriesData?.filter(repo => {
     const searchLower = searchQuery.toLowerCase();
     return (
       repo.name.toLowerCase().includes(searchLower) ||

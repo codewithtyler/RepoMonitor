@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRepositoriesData, type Repository } from '@/lib/hooks/use-repository-data';
 import { type SearchResult } from '@/lib/contexts/search-context';
@@ -16,7 +16,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
-  const { selectedRepository, recentlyAnalyzed } = useAnalysis();
+  const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis();
 
   const filteredRepositories = repositories?.filter(repo => {
     if (!searchQuery) return true;
@@ -24,7 +24,7 @@ export function Dashboard() {
   });
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
-    navigate(`/analyze/${repository.owner}/${repository.name}`);
+    selectRepository(repository);
   };
 
   if (isLoading) {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useRef } from 'react'
 import { getGitHubClient } from '@/lib/github'
 import { getAuthState } from '@/lib/auth/global-state'
 
@@ -25,6 +25,7 @@ interface SearchContextType {
   error: Error | null;
   recentSearches: SearchResult[];
   removeRecentSearch: (id: number) => void;
+  clearRecentSearches: () => void;
   search: (searchQuery: string) => Promise<void>;
   hasMore: boolean;
   loadMore: () => Promise<void>;
@@ -47,8 +48,6 @@ interface CachedResults {
   hasMore: boolean;
   page: number;
 }
-
-let searchCache: CachedResults | null = null;
 
 function getRecentSearches(): SearchResult[] {
   try {
@@ -82,6 +81,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>(getRecentSearches());
   const [hasMore, setHasMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const searchCacheRef = useRef<CachedResults | null>(null);
 
   const addToRecentSearches = useCallback((result: SearchResult) => {
     setRecentSearches(prev => {
@@ -107,6 +107,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
     const client = await getGitHubClient(state.user.id);
     const searchResults = await client.searchRepositories(searchQuery, {
+      query: searchQuery,
       page,
       per_page: pageSize,
       sort: 'stars',
@@ -134,23 +135,25 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       setCurrentPage(1);
+      setDisplayedResults([]);
+      setResults([]);
 
       // Check cache first
-      if (isCacheValid(searchCache, searchQuery)) {
-        setResults(searchCache.results);
-        setDisplayedResults(searchCache.results.slice(0, searchCache.displayedCount));
-        setHasMore(searchCache.hasMore);
+      if (isCacheValid(searchCacheRef.current, searchQuery)) {
+        const cache = searchCacheRef.current!;
+        setResults(cache.results);
+        setDisplayedResults(cache.results.slice(0, DISPLAY_BATCH_SIZE));
+        setHasMore(cache.hasMore);
         return;
       }
 
       const results = await searchWithCache(searchQuery, 1, INITIAL_PAGE_SIZE);
       setResults(results);
-      // Show first batch
       setDisplayedResults(results.slice(0, DISPLAY_BATCH_SIZE));
       setHasMore(results.length === INITIAL_PAGE_SIZE);
 
       // Update cache
-      searchCache = {
+      searchCacheRef.current = {
         query: searchQuery,
         results,
         displayedCount: DISPLAY_BATCH_SIZE,
@@ -171,48 +174,23 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
 
-      // First, try to show more from existing results
-      if (results.length > displayedResults.length) {
-        const nextBatchEnd = displayedResults.length + DISPLAY_BATCH_SIZE;
-        const newDisplayedResults = results.slice(0, nextBatchEnd);
-        setDisplayedResults(newDisplayedResults);
+      // Only show more from existing results (max 30)
+      const nextBatchEnd = displayedResults.length + DISPLAY_BATCH_SIZE;
+      const newDisplayedResults = results.slice(0, nextBatchEnd);
+      setDisplayedResults(newDisplayedResults);
 
-        if (searchCache && searchCache.query === query) {
-          searchCache.displayedCount = nextBatchEnd;
-        }
-
-        if (nextBatchEnd >= results.length && results.length < INITIAL_PAGE_SIZE) {
-          setHasMore(false);
-        }
-      } else {
-        // Need to fetch more results
-        const nextPage = currentPage + 1;
-        const newResults = await searchWithCache(query, nextPage, DISPLAY_BATCH_SIZE);
-
-        if (newResults.length > 0) {
-          const updatedResults = [...results, ...newResults];
-          setResults(updatedResults);
-          setDisplayedResults(updatedResults.slice(0, displayedResults.length + DISPLAY_BATCH_SIZE));
-          setHasMore(newResults.length === DISPLAY_BATCH_SIZE);
-          setCurrentPage(nextPage);
-
-          // Update cache
-          if (searchCache && searchCache.query === query) {
-            searchCache.results = updatedResults;
-            searchCache.displayedCount = displayedResults.length + DISPLAY_BATCH_SIZE;
-            searchCache.hasMore = newResults.length === DISPLAY_BATCH_SIZE;
-            searchCache.page = nextPage;
-          }
-        } else {
-          setHasMore(false);
-        }
+      if (searchCacheRef.current && searchCacheRef.current.query === query) {
+        searchCacheRef.current.displayedCount = nextBatchEnd;
       }
+
+      // Set hasMore to false when we've shown all 30 results
+      setHasMore(nextBatchEnd < results.length);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load more results'));
     } finally {
       setLoading(false);
     }
-  }, [query, loading, hasMore, currentPage, results, displayedResults, searchWithCache]);
+  }, [query, loading, hasMore, results, displayedResults]);
 
   const clearSearch = useCallback(() => {
     setQuery('');
@@ -221,7 +199,12 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     setHasMore(false);
     setCurrentPage(1);
     setError(null);
-    searchCache = null;
+    searchCacheRef.current = null;
+  }, []);
+
+  const clearRecentSearches = useCallback(() => {
+    setRecentSearches([]);
+    saveRecentSearches([]);
   }, []);
 
   return (
@@ -234,6 +217,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         error,
         recentSearches,
         removeRecentSearch,
+        clearRecentSearches,
         search,
         hasMore,
         loadMore,

@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { Star, X } from 'lucide-react';
 import { getAuthState } from '@/lib/auth/global-state';
 import { theme } from '@/config/theme';
 import type { SearchResult } from '@/lib/contexts/search-context';
-import { CustomScrollbar } from '@/components/common/custom-scrollbar';
+
+const DISPLAY_BATCH_SIZE = 10; // Number of items to show per batch
 
 interface Props {
   query: string;
@@ -12,6 +14,8 @@ interface Props {
   recentSearches: SearchResult[];
   onSelect: (result: SearchResult) => void;
   onSelectRecentSearch: (result: SearchResult) => void;
+  onRemoveRecentSearch: (id: number) => void;
+  onClearRecentSearches: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
 }
@@ -24,12 +28,13 @@ export function SearchResultsDropdown({
   recentSearches,
   onSelect,
   onSelectRecentSearch,
+  onRemoveRecentSearch,
+  onClearRecentSearches,
   hasMore,
   onLoadMore,
 }: Props) {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const loadingRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const initUser = async () => {
@@ -39,11 +44,13 @@ export function SearchResultsDropdown({
     initUser();
   }, []);
 
-  const handleScroll = useCallback((node: HTMLDivElement) => {
-    if (loading || !hasMore) return;
+  const handleScroll = useCallback(() => {
+    if (!dropdownRef.current || loading || !hasMore) return;
 
+    const { scrollTop, scrollHeight, clientHeight } = dropdownRef.current;
     const threshold = 50; // pixels from bottom
-    if (node.scrollHeight - node.scrollTop - node.clientHeight < threshold) {
+
+    if (scrollHeight - scrollTop - clientHeight < threshold) {
       onLoadMore();
     }
   }, [loading, hasMore, onLoadMore]);
@@ -52,155 +59,151 @@ export function SearchResultsDropdown({
     const dropdown = dropdownRef.current;
     if (!dropdown) return;
 
-    const handleScrollEvent = () => handleScroll(dropdown);
-    dropdown.addEventListener('scroll', handleScrollEvent);
-    return () => dropdown.removeEventListener('scroll', handleScrollEvent);
+    dropdown.addEventListener('scroll', handleScroll);
+    return () => dropdown.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
-
-  if (!query && recentSearches.length === 0) {
-    return null;
-  }
-
-  if (loading) {
-    return (
-      <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg" style={{ backgroundColor: theme.colors.background.secondary }}>
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-2" style={{ borderColor: theme.colors.text.secondary, borderTopColor: 'transparent' }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
-      <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg" style={{ backgroundColor: theme.colors.background.secondary }}>
-        <div className="px-4 py-3">
-          <div className="text-sm" style={{ color: theme.colors.error.primary }}>
-            {error.message}
-          </div>
+      <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden" style={{ backgroundColor: theme.colors.background.secondary }}>
+        <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.error }}>
+          {error.message}
         </div>
       </div>
     );
   }
 
-  if (!query && recentSearches.length > 0) {
+  const renderResults = (items: SearchResult[], isRecent = false): JSX.Element => {
+    const ownedRepos = items.filter(repo => repo.owner === currentUser);
+    const otherRepos = items.filter(repo => repo.owner !== currentUser);
+
     return (
-      <div className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg" style={{ backgroundColor: theme.colors.background.secondary }}>
-        <div className="py-2">
-          <div className="px-3 py-1.5">
-            <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
-              Recent Searches
-            </div>
-          </div>
-          <div className="max-h-60 overflow-y-auto">
-            {recentSearches.slice(0, 5).map((result) => (
-              <button
-                key={result.id}
-                onClick={() => onSelectRecentSearch(result)}
-                className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors"
-              >
-                <div className="flex items-center">
-                  <span className="text-sm truncate" style={{ color: theme.colors.text.primary }}>
-                    {result.owner}/{result.name}
-                  </span>
+      <>
+        {query && results.length > 0 && (
+          <>
+            {ownedRepos.length > 0 && (
+              <>
+                <div className="px-3 py-1.5">
+                  <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
+                    Owned
+                  </div>
                 </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+                {ownedRepos.map((repo) => (
+                  <button
+                    key={repo.id}
+                    onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="truncate">
+                        <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
+                        <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
+                          <Star className="h-4 w-4" />
+                          <span className="text-xs">{repo.stargazersCount}</span>
+                        </div>
+                        {isRecent && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onRemoveRecentSearch(repo.id); }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
 
-  const sortedResults = results.reduce((acc, repo, index) => {
-    if (repo.owner === currentUser) {
-      acc.owned.push({ ...repo, batchIndex: Math.floor((acc.owned.length) / 10) });
-    } else {
-      acc.other.push({ ...repo, batchIndex: Math.floor((acc.other.length) / 10) });
-    }
-    return acc;
-  }, { owned: [] as (SearchResult & { batchIndex: number })[], other: [] as (SearchResult & { batchIndex: number })[] });
-
-  // Sort both arrays by stars
-  sortedResults.owned.sort((a, b) => b.stargazersCount - a.stargazersCount);
-  sortedResults.other.sort((a, b) => b.stargazersCount - a.stargazersCount);
-
-  const renderResults = (items: (SearchResult & { batchIndex: number })[]) => {
-    let currentBatch = -1;
-    return items.map((repo, index) => {
-      const showSeparator = repo.batchIndex !== currentBatch && index !== 0 && index % 10 === 0;
-      currentBatch = repo.batchIndex;
-      return (
-        <div key={repo.id}>
-          {showSeparator && (
-            <div className="my-2 border-t" style={{ borderColor: theme.colors.border.primary }} />
-          )}
-          <button
-            onClick={() => onSelect(repo)}
-            className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors"
-          >
-            <div className="flex items-center">
-              <span className="text-sm truncate" style={{ color: theme.colors.text.primary }}>
-                {repo.owner}/{repo.name}
-              </span>
-            </div>
-          </button>
-        </div>
-      );
-    });
-  };
-
-  return (
-    <CustomScrollbar
-      ref={dropdownRef}
-      className="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg max-h-96 overflow-y-auto"
-      style={{ backgroundColor: theme.colors.background.secondary }}
-    >
-      <div className="py-2">
-        {sortedResults.owned.length > 0 && (
-          <>
-            <div className="px-3 py-1.5">
-              <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
-                Owned
-              </div>
-            </div>
-            <div>
-              {renderResults(sortedResults.owned)}
-            </div>
+            {otherRepos.length > 0 && (
+              <>
+                {ownedRepos.length > 0 && (
+                  <div className="mx-3 my-1 border-t" style={{ borderColor: theme.colors.border.primary }} />
+                )}
+                <div className="px-3 py-1.5">
+                  <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
+                    All Results
+                  </div>
+                </div>
+                {otherRepos.slice(0, DISPLAY_BATCH_SIZE - ownedRepos.length).map((repo) => (
+                  <button
+                    key={repo.id}
+                    onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="truncate">
+                        <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
+                        <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
+                          <Star className="h-4 w-4" />
+                          <span className="text-xs">{repo.stargazersCount}</span>
+                        </div>
+                        {isRecent && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onRemoveRecentSearch(repo.id); }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
           </>
         )}
 
-        {sortedResults.owned.length > 0 && sortedResults.other.length > 0 && (
-          <div className="my-2 border-t" style={{ borderColor: theme.colors.border.primary }} />
-        )}
-
-        {sortedResults.other.length > 0 && (
-          <>
-            <div className="px-3 py-1.5">
-              <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
-                All Results
-              </div>
-            </div>
-            <div>
-              {renderResults(sortedResults.other)}
-            </div>
-          </>
-        )}
+        {!query && recentSearches.length > 0 && renderResults(recentSearches.slice(0, 5), true)}
 
         {loading && (
-          <div ref={loadingRef} className="px-3 py-2 flex justify-center">
+          <div className="px-3 py-2 flex justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-2" style={{ borderColor: theme.colors.text.secondary, borderTopColor: 'transparent' }} />
           </div>
         )}
 
         {!loading && !hasMore && results.length > 0 && (
-          <div className="px-3 py-2 text-center text-sm" style={{ color: theme.colors.text.secondary }}>
-            End of Results
+          <div className="px-3 py-2 text-xs text-center" style={{ color: theme.colors.text.secondary }}>
+            End of results
           </div>
         )}
+      </>
+    );
+  };
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute z-10 w-full mt-1 rounded-md shadow-lg max-h-[24rem] overflow-y-auto"
+      style={{ backgroundColor: theme.colors.background.secondary }}
+    >
+      <div className="py-2">
+        {renderResults(results)}
       </div>
-    </CustomScrollbar>
+
+      <style>{`
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: ${theme.colors.background.secondary};
+        }
+        ::-webkit-scrollbar-thumb {
+          background: ${theme.colors.border.primary};
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: ${theme.colors.text.secondary};
+        }
+      `}</style>
+    </div>
   );
 }

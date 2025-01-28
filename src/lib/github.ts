@@ -132,15 +132,23 @@ class GitHubClientImpl implements GitHubClient {
     return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
-  async searchRepositories(query: string, options: SearchOptions = {}): Promise<SearchResponse> {
-    console.log('Searching repositories:', { query, options });
-
-    const params = new URLSearchParams({
-      q: query,
-      page: (options.page || 1).toString(),
-      per_page: (options.per_page || 10).toString(),
+  async searchRepositories(query: string, options: Partial<Omit<SearchOptions, 'query'>> = {}): Promise<SearchResponse> {
+    const searchOptions = {
+      query,
+      page: options.page || 1,
+      per_page: options.per_page,
       sort: options.sort || 'stars',
       order: options.order || 'desc'
+    };
+
+    console.log('Searching repositories:', { query: searchOptions.query, options: searchOptions });
+
+    const params = new URLSearchParams({
+      q: searchOptions.query,
+      page: searchOptions.page.toString(),
+      per_page: searchOptions.per_page?.toString() || '30',
+      sort: searchOptions.sort,
+      order: searchOptions.order
     });
 
     return this.request<SearchResponse>(`/search/repositories?${params}`);
