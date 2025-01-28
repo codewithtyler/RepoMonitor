@@ -73,96 +73,115 @@ export function SearchResultsDropdown({
     );
   }
 
-  const renderResults = (items: SearchResult[], isRecent = false): JSX.Element => {
-    const ownedRepos = items.filter(repo => repo.owner === currentUser);
-    const otherRepos = items.filter(repo => repo.owner !== currentUser);
+  const renderRepositoryItem = (repo: SearchResult, isRecent: boolean) => (
+    <button
+      key={repo.id}
+      onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
+      className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
+    >
+      <div className="flex items-center justify-between">
+        <div className="truncate">
+          <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
+          <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
+            <Star className="h-4 w-4" />
+            <span className="text-xs">{repo.stargazersCount}</span>
+          </div>
+          {isRecent && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onRemoveRecentSearch(repo.id);
+              }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+            </button>
+          )}
+        </div>
+      </div>
+    </button>
+  );
 
-    return (
-      <>
-        {query && results.length > 0 && (
-          <>
-            {ownedRepos.length > 0 && (
-              <>
-                <div className="px-3 py-1.5">
-                  <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
-                    Owned
+  return (
+    <div
+      ref={dropdownRef}
+      className="absolute z-10 w-full mt-1 rounded-md shadow-lg max-h-[24rem] overflow-y-auto"
+      style={{ backgroundColor: theme.colors.background.secondary }}
+    >
+      <div className="py-2">
+        {query ? (
+          // Search Results
+          results.length > 0 && (
+            <>
+              {/* Owned Repositories */}
+              {results.filter(repo => repo.owner === currentUser).length > 0 && (
+                <>
+                  <div className="px-3 py-1.5">
+                    <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
+                      Owned
+                    </div>
                   </div>
-                </div>
-                {ownedRepos.map((repo) => (
-                  <button
-                    key={repo.id}
-                    onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="truncate">
-                        <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
-                        <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
+                  {results
+                    .filter(repo => repo.owner === currentUser)
+                    .map(repo => renderRepositoryItem(repo, false))}
+                </>
+              )}
+
+              {/* Other Repositories */}
+              {results.filter(repo => repo.owner !== currentUser).length > 0 && (
+                <>
+                  {results.filter(repo => repo.owner === currentUser).length > 0 && (
+                    <div className="relative px-3 py-2">
+                      <div className="absolute inset-0 flex items-center px-3">
+                        <div className="w-full h-px" style={{ backgroundColor: theme.colors.border.primary }} />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
-                          <Star className="h-4 w-4" />
-                          <span className="text-xs">{repo.stargazersCount}</span>
-                        </div>
-                        {isRecent && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onRemoveRecentSearch(repo.id); }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
-                          </button>
-                        )}
+                      <div className="relative flex justify-center">
+                        <span className="px-2 text-xs font-medium" style={{
+                          color: theme.colors.text.secondary,
+                          backgroundColor: theme.colors.background.secondary
+                        }}>
+                          All Results
+                        </span>
                       </div>
                     </div>
-                  </button>
-                ))}
-              </>
-            )}
-
-            {otherRepos.length > 0 && (
-              <>
-                {ownedRepos.length > 0 && (
-                  <div className="mx-3 my-1 border-t" style={{ borderColor: theme.colors.border.primary }} />
-                )}
-                <div className="px-3 py-1.5">
-                  <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
-                    All Results
-                  </div>
+                  )}
+                  {results
+                    .filter(repo => repo.owner !== currentUser)
+                    .slice(0, DISPLAY_BATCH_SIZE - results.filter(repo => repo.owner === currentUser).length)
+                    .map(repo => renderRepositoryItem(repo, false))}
+                </>
+              )}
+            </>
+          )
+        ) : (
+          // Recent Searches
+          recentSearches.length > 0 && (
+            <>
+              <div className="px-3 py-1.5 flex justify-between items-center">
+                <div className="text-xs font-medium" style={{ color: theme.colors.text.secondary }}>
+                  Recent Searches
                 </div>
-                {otherRepos.slice(0, DISPLAY_BATCH_SIZE - ownedRepos.length).map((repo) => (
-                  <button
-                    key={repo.id}
-                    onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
-                    className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="truncate">
-                        <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
-                        <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
-                          <Star className="h-4 w-4" />
-                          <span className="text-xs">{repo.stargazersCount}</span>
-                        </div>
-                        {isRecent && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onRemoveRecentSearch(repo.id); }}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </>
-            )}
-          </>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onClearRecentSearches();
+                  }}
+                  className="text-xs hover:text-opacity-80 transition-opacity"
+                  style={{ color: theme.colors.text.secondary }}
+                >
+                  Clear All
+                </button>
+              </div>
+              {recentSearches.slice(0, 5).map(repo => renderRepositoryItem(repo, true))}
+            </>
+          )
         )}
-
-        {!query && recentSearches.length > 0 && renderResults(recentSearches.slice(0, 5), true)}
 
         {loading && (
           <div className="px-3 py-2 flex justify-center">
@@ -175,18 +194,6 @@ export function SearchResultsDropdown({
             End of results
           </div>
         )}
-      </>
-    );
-  };
-
-  return (
-    <div
-      ref={dropdownRef}
-      className="absolute z-10 w-full mt-1 rounded-md shadow-lg max-h-[24rem] overflow-y-auto"
-      style={{ backgroundColor: theme.colors.background.secondary }}
-    >
-      <div className="py-2">
-        {renderResults(results)}
       </div>
 
       <style>{`

@@ -174,16 +174,22 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
 
-      // Only show more from existing results (max 30)
-      const nextBatchEnd = displayedResults.length + DISPLAY_BATCH_SIZE;
+      // Calculate next batch end, ensuring we don't exceed total results
+      const nextBatchEnd = Math.min(
+        displayedResults.length + DISPLAY_BATCH_SIZE,
+        results.length
+      );
+
+      // Get all results up to the next batch end
       const newDisplayedResults = results.slice(0, nextBatchEnd);
       setDisplayedResults(newDisplayedResults);
 
+      // Update cache if it exists
       if (searchCacheRef.current && searchCacheRef.current.query === query) {
         searchCacheRef.current.displayedCount = nextBatchEnd;
       }
 
-      // Set hasMore to false when we've shown all 30 results
+      // Set hasMore based on whether there are more results to show
       setHasMore(nextBatchEnd < results.length);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load more results'));

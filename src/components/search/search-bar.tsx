@@ -22,6 +22,8 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
     loading,
     error,
     recentSearches,
+    removeRecentSearch,
+    clearRecentSearches,
     search,
     hasMore,
     loadMore,
@@ -115,6 +117,8 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
           recentSearches={recentSearches}
           onSelect={handleSelect}
           onSelectRecentSearch={handleSelectRecentSearch}
+          onRemoveRecentSearch={removeRecentSearch}
+          onClearRecentSearches={clearRecentSearches}
           hasMore={hasMore}
           onLoadMore={loadMore}
         />
