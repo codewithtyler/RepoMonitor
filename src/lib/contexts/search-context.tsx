@@ -80,7 +80,6 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>(getRecentSearches());
   const [hasMore, setHasMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const searchCacheRef = useRef<CachedResults | null>(null);
 
   const addToRecentSearches = useCallback((result: SearchResult) => {
@@ -134,9 +133,6 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       setError(null);
-      setCurrentPage(1);
-      setDisplayedResults([]);
-      setResults([]);
 
       // Check cache first
       if (isCacheValid(searchCacheRef.current, searchQuery)) {
@@ -203,7 +199,6 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     setResults([]);
     setDisplayedResults([]);
     setHasMore(false);
-    setCurrentPage(1);
     setError(null);
     searchCacheRef.current = null;
   }, []);

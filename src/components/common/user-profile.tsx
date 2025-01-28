@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
 import { supabase } from '@/lib/auth/supabase-client';
 import { theme } from '@/config/theme';
+import { ChevronDown } from 'lucide-react';
 
 export function UserProfile() {
   const [state, setState] = useState<AuthState>({
@@ -52,42 +53,27 @@ export function UserProfile() {
             className="w-8 h-8 rounded-full"
           />
         )}
-        <span className="text-sm font-medium whitespace-nowrap" style={{ color: theme.colors.text.primary }}>
-          Hey {firstName}
-        </span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
-          style={{ color: theme.colors.text.secondary }}
-        >
-          <path
-            d="M4 6L8 10L12 6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium whitespace-nowrap" style={{ color: theme.colors.text.primary }}>
+            Hey {firstName}
+          </span>
+          <ChevronDown
+            size={16}
+            className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
+            style={{ color: theme.colors.text.primary }}
           />
-        </svg>
+        </div>
       </button>
 
       {showDropdown && (
         <div
-          className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg py-1"
+          className="absolute right-4 mt-2 w-48 rounded-lg shadow-lg py-1"
           style={{ backgroundColor: theme.colors.background.secondary }}
         >
-          <div className="px-3 py-2 border-b" style={{ borderColor: theme.colors.border.primary }}>
-            <div className="text-sm" style={{ color: theme.colors.text.secondary }}>
-              {state.user.email}
-            </div>
-          </div>
-
           <button
             onClick={handleSignOut}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-500/5 transition-colors"
-            style={{ color: theme.colors.text.primary }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-red-500/10 transition-colors"
+            style={{ color: theme.colors.error.primary }}
           >
             Sign out
           </button>

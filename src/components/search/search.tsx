@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearch } from '@/lib/contexts/search-context';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import type { SearchResult } from '@/lib/contexts/search-context';

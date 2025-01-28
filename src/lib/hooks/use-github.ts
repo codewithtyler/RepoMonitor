@@ -4,24 +4,41 @@ import type { GitHubClient } from '@/lib/github';
 import { toast } from 'sonner';
 import { getAuthState, subscribeToAuth } from '../auth/global-state';
 import { useQuery } from '@tanstack/react-query';
+import { logger } from '@/lib/utils/logger';
 
 // Using getAuthState() from global-state instead of useUser() hook
 // to prevent multiple Supabase requests across components.
 // This ensures all components share the same auth state.
 
 export function useGitHub() {
-  return useQuery({
-    queryKey: ['github'],
-    queryFn: async () => {
-      const state = await getAuthState();
-      if (!state.user) {
-        throw new Error('User must be authenticated');
-      }
+  const { user } = useUser();
+  const [client, setClient] = useState<GitHubClient | null>(null);
 
-      const client = await getGitHubClient(state.user.id);
-      return client;
+  useEffect(() => {
+    if (!user) return;
+
+    GitHubClient.create(user.id)
+      .then(setClient)
+      .catch(error => {
+        logger.error('Failed to initialize GitHub client:', error);
+      });
+  }, [user]);
+
+  const withGitHub = useCallback(async <T>(fn: (client: GitHubClient) => Promise<T>): Promise<T | null> => {
+    if (!client) {
+      logger.error('GitHub client not initialized');
+      return null;
     }
-  });
+
+    try {
+      return await fn(client);
+    } catch (error) {
+      logger.error('GitHub API error:', error);
+      throw error;
+    }
+  }, [client]);
+
+  return { client, withGitHub };
 }
 
 export function useGitHubUser() {

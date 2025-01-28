@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useUser } from '../auth/hooks';
 import { supabase } from '../auth/supabase-client';
+import { logger } from '@/lib/utils/logger';
 
 export interface Notification {
     id: string;
@@ -56,7 +57,8 @@ export function useNotifications() {
             if (error) throw error;
             setNotifications(data || []);
         } catch (error) {
-            console.error('Error fetching notifications:', error);
+            logger.error('Error fetching notifications:', error);
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -75,7 +77,8 @@ export function useNotifications() {
                 n.id === id ? { ...n, is_read: true } : n
             ));
         } catch (error) {
-            console.error('Error marking notification as read:', error);
+            logger.error('Error marking notification as read:', error);
+            throw error;
         }
     };
 
@@ -91,7 +94,8 @@ export function useNotifications() {
 
             setNotifications(notifications.map(n => ({ ...n, is_read: true })));
         } catch (error) {
-            console.error('Error marking all notifications as read:', error);
+            logger.error('Error marking all notifications as read:', error);
+            throw error;
         }
     };
 

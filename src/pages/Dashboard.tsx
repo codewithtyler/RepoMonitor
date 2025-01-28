@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useRepositoriesData, type Repository } from '@/lib/hooks/use-repository-data';
 import { type SearchResult } from '@/lib/contexts/search-context';
 import { GlobalStatsCard } from '@/components/common/global-stats-card';
@@ -13,7 +12,6 @@ import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { theme } from '@/config/theme';
 
 export function Dashboard() {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
   const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis();

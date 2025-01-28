@@ -1,5 +1,6 @@
 import { GitHubTokenManager } from './auth/github-token-manager';
 import { RateLimiter } from 'limiter';
+import { logger } from '@/lib/utils/logger';
 
 // Per-user rate limiter (5000 requests per hour per token)
 const userLimiters = new Map<string, RateLimiter>();
@@ -66,7 +67,7 @@ export interface GitHubClient {
   }): Promise<any[]>;
 }
 
-class GitHubClientImpl implements GitHubClient {
+export class GitHubClientImpl implements GitHubClient {
   private token: string;
   private limiter: RateLimiter;
 
@@ -84,7 +85,7 @@ class GitHubClientImpl implements GitHubClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    console.log('Making GitHub API request:', path);
+    logger.debug('Making GitHub API request:', { path });
 
     // Wait for rate limit
     await this.limiter.removeTokens(1);
@@ -115,20 +116,19 @@ class GitHubClientImpl implements GitHubClient {
 
   static async create(userId: string): Promise<GitHubClient> {
     try {
-      const token = await GitHubTokenManager.getToken();
+      const token = await GitHubTokenManager.getToken(userId);
+      if (!token) {
+        throw new Error('No GitHub token found');
+      }
       return new GitHubClientImpl(token, userId);
     } catch (error) {
-      console.error('[GitHubClient] Failed to create client:', error);
-      // Clear token and redirect to auth
-      GitHubTokenManager.clearToken();
-      const redirectUrl = new URL('/auth/callback', window.location.origin);
-      window.location.href = redirectUrl.toString();
+      logger.error('[GitHubClient] Failed to create client:', error);
       throw error;
     }
   }
 
   async getRepository(owner: string, repo: string): Promise<GitHubRepository> {
-    console.log('Fetching repository:', { owner, repo });
+    logger.debug('Fetching repository:', { owner, repo });
     return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
@@ -141,7 +141,7 @@ class GitHubClientImpl implements GitHubClient {
       order: options.order || 'desc'
     };
 
-    console.log('Searching repositories:', { query: searchOptions.query, options: searchOptions });
+    logger.debug('Searching repositories:', { query: searchOptions.query, options: searchOptions });
 
     const params = new URLSearchParams({
       q: searchOptions.query,
