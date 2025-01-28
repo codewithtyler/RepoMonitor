@@ -3,7 +3,6 @@ import { theme } from '@/config/theme';
 import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { RepoStatsCard } from '@/components/common/repo-stats-card';
-import { useNavigate } from 'react-router-dom';
 
 interface RepositoryDetailViewProps {
   owner: string;
@@ -12,8 +11,7 @@ interface RepositoryDetailViewProps {
 
 export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps) {
   const { data: repository, isLoading } = useRepositoryDetails(owner, name);
-  const { analysisState, startAnalysis } = useAnalysis();
-  const navigate = useNavigate();
+  const { analysisState, startAnalysis, clearSelection } = useAnalysis();
 
   if (isLoading || !repository) {
     return (
@@ -32,7 +30,59 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
   };
 
   const handleBackToDashboard = () => {
-    navigate('/');
+    clearSelection();
+  };
+
+  // Helper function to get phase progress percentage
+  const getPhaseProgress = (phase: string) => {
+    if (!analysisState?.phase) return 0;
+    const phases = ['not_started', 'cloning', 'analyzing', 'indexing', 'complete'];
+    const currentIndex = phases.indexOf(analysisState.phase);
+    const phaseIndex = phases.indexOf(phase);
+
+    if (currentIndex === phaseIndex) {
+      return analysisState.progress || 0;
+    }
+    if (currentIndex > phaseIndex) {
+      return 100;
+    }
+    return 0;
+  };
+
+  // Helper function to create the circular progress SVG
+  const CircularProgress = ({ progress }: { progress: number }) => {
+    const size = 32; // w-8 h-8 = 32px
+    const strokeWidth = 2;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const offset = circumference - (progress / 100) * circumference;
+
+    return (
+      <svg className="transform -rotate-90 w-8 h-8">
+        <circle
+          className="opacity-20"
+          stroke={theme.colors.brand.primary}
+          fill="transparent"
+          strokeWidth={strokeWidth}
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        <circle
+          stroke={theme.colors.brand.primary}
+          fill="transparent"
+          strokeWidth={strokeWidth}
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={offset}
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+          style={{
+            transition: 'stroke-dashoffset 0.5s ease'
+          }}
+        />
+      </svg>
+    );
   };
 
   return (
@@ -99,33 +149,33 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
               Issue Analysis
             </h3>
             <p className="text-sm" style={{ color: theme.colors.text.secondary }}>
-              {!analysisState?.phase ? 'Click Start Analysis to begin analyzing this repository' : 'Analysis in progress - please do not close this window'}
+              {!analysisState?.phase || analysisState.phase === 'not_started'
+                ? 'Click Start Analysis to begin analyzing this repository'
+                : 'Analysis in progress - please do not close this window'}
             </p>
           </div>
-          {!analysisState?.phase && (
-            <button
-              onClick={handleStartAnalysis}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: theme.colors.brand.primary,
-                color: theme.colors.text.inverse
-              }}
-            >
-              Start Analysis
-            </button>
-          )}
+          {/* Analysis Button */}
+          <button
+            onClick={handleStartAnalysis}
+            className="px-4 py-2 rounded-lg text-white transition-colors"
+            style={{ backgroundColor: theme.colors.brand.primary }}
+          >
+            {analysisState?.phase === 'complete' ? 'Re-Analyze' : 'Start Analysis'}
+          </button>
         </div>
 
-        {/* Analysis Phases */}
+        {/* Analysis Progress */}
         {analysisState?.phase && analysisState.phase !== 'not_started' && (
           <div className="space-y-4">
             {/* Data Collection Phase */}
             <div className="flex items-center gap-4">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${analysisState.phase === 'cloning' ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
-                <span className="text-xs text-white">
-                  {analysisState.phase === 'cloning' ? '100%' : '0%'}
-                </span>
+              <div className="relative">
+                <CircularProgress progress={getPhaseProgress('cloning')} />
+                {getPhaseProgress('cloning') === 100 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    100%
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>
@@ -139,11 +189,13 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
 
             {/* Processing Phase */}
             <div className="flex items-center gap-4">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${analysisState.phase === 'analyzing' ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
-                <span className="text-xs text-white">
-                  {analysisState.phase === 'analyzing' ? '100%' : '0%'}
-                </span>
+              <div className="relative">
+                <CircularProgress progress={getPhaseProgress('analyzing')} />
+                {getPhaseProgress('analyzing') === 100 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    100%
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>
@@ -157,11 +209,13 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
 
             {/* Analysis Phase */}
             <div className="flex items-center gap-4">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${analysisState.phase === 'indexing' ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
-                <span className="text-xs text-white">
-                  {analysisState.phase === 'indexing' ? '100%' : '0%'}
-                </span>
+              <div className="relative">
+                <CircularProgress progress={getPhaseProgress('indexing')} />
+                {getPhaseProgress('indexing') === 100 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    100%
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>
@@ -175,11 +229,13 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
 
             {/* Report Generation Phase */}
             <div className="flex items-center gap-4">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${analysisState.phase === 'complete' ? 'bg-green-500' : 'bg-gray-300'
-                }`}>
-                <span className="text-xs text-white">
-                  {analysisState.phase === 'complete' ? '100%' : '0%'}
-                </span>
+              <div className="relative">
+                <CircularProgress progress={getPhaseProgress('complete')} />
+                {getPhaseProgress('complete') === 100 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
+                    100%
+                  </div>
+                )}
               </div>
               <div>
                 <h4 className="font-medium" style={{ color: theme.colors.text.primary }}>

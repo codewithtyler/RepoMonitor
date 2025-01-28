@@ -79,7 +79,9 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
   };
 
   const handleFocus = () => {
-    setShowDropdown(true);
+    if (value || (recentSearches && recentSearches.length > 0)) {
+      setShowDropdown(true);
+    }
     if (!value) {
       clearSearch();
     }

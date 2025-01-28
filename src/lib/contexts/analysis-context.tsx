@@ -13,6 +13,7 @@ interface AnalysisState {
 interface AnalysisContextType {
     selectedRepository: (Repository | SearchResult) | null;
     analysisState: AnalysisState | null;
+    recentlyAnalyzed: (Repository | SearchResult)[];
     selectRepository: (repository: Repository | SearchResult) => void;
     startAnalysis: () => Promise<void>;
     clearSelection: () => void;
@@ -23,10 +24,10 @@ const AnalysisContext = createContext<AnalysisContextType | null>(null);
 export function AnalysisProvider({ children }: { children: React.ReactNode }) {
     const [selectedRepository, setSelectedRepository] = useState<(Repository | SearchResult) | null>(null);
     const [analysisState, setAnalysisState] = useState<AnalysisState | null>(null);
+    const [recentlyAnalyzed, setRecentlyAnalyzed] = useState<(Repository | SearchResult)[]>([]);
 
     const selectRepository = useCallback((repository: Repository | SearchResult) => {
         setSelectedRepository(repository);
-        // Set initial analysis state based on repository status
         setAnalysisState({
             phase: 'not_started',
             progress: 0
@@ -39,15 +40,25 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
         try {
             // Update state to show progress
             setAnalysisState({ phase: 'cloning', progress: 0 });
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
+            // Simulate analysis phases
+            await new Promise(resolve => setTimeout(resolve, 1000));
             setAnalysisState({ phase: 'analyzing', progress: 33 });
-            await new Promise(resolve => setTimeout(resolve, 1000));
 
+            await new Promise(resolve => setTimeout(resolve, 1000));
             setAnalysisState({ phase: 'indexing', progress: 66 });
-            await new Promise(resolve => setTimeout(resolve, 1000));
 
+            await new Promise(resolve => setTimeout(resolve, 1000));
             setAnalysisState({ phase: 'complete', progress: 100 });
+
+            // Add to recently analyzed list, keeping only the last 10
+            setRecentlyAnalyzed(prev => {
+                const newList = [
+                    selectedRepository,
+                    ...prev.filter(repo => repo.id !== selectedRepository.id)
+                ].slice(0, 10);
+                return newList;
+            });
         } catch (error) {
             setAnalysisState({
                 phase: 'error',
@@ -66,6 +77,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
             value={{
                 selectedRepository,
                 analysisState,
+                recentlyAnalyzed,
                 selectRepository,
                 startAnalysis,
                 clearSelection

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRepositoriesData, type Repository } from '@/lib/hooks/use-repository-data';
+import { type SearchResult } from '@/lib/contexts/search-context';
 import { GlobalStatsCard } from '@/components/common/global-stats-card';
 import { RepositoryList } from '@/components/repository/repository-list';
 import { SearchBar } from '@/components/search/search-bar';
@@ -15,16 +16,14 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
-  const { selectedRepository } = useAnalysis();
-
-  const recentlyAnalyzed = repositories?.filter(repo => repo.lastAnalysisTimestamp).slice(0, 5) || [];
+  const { selectedRepository, recentlyAnalyzed } = useAnalysis();
 
   const filteredRepositories = repositories?.filter(repo => {
     if (!searchQuery) return true;
     return `${repo.owner}/${repo.name}`.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const handleRepositorySelect = (repository: Repository) => {
+  const handleRepositorySelect = (repository: Repository | SearchResult) => {
     navigate(`/analyze/${repository.owner}/${repository.name}`);
   };
 
@@ -103,16 +102,22 @@ export function Dashboard() {
       layoutOrder: 1
     },
     {
+      title: 'Open Issues',
+      value: repositories?.reduce((total, repo) => total + (repo.openIssuesCount || 0), 0) || 0,
+      description: 'Across all tracked repositories',
+      layoutOrder: 2
+    },
+    {
       title: 'Analyzed Repositories',
       value: recentlyAnalyzed.length,
       description: 'Repositories that have been analyzed',
-      layoutOrder: 2
+      layoutOrder: 3
     },
     {
       title: 'Active Analysis',
       value: 0,
       description: 'Repositories currently being analyzed',
-      layoutOrder: 3
+      layoutOrder: 4
     }
   ];
 
@@ -196,11 +201,11 @@ export function Dashboard() {
               />
             ) : (
               <>
-                {/* Show global stats in main area when no repo selected */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {stats.map((stat) => (
+                {/* Global Stats */}
+                <div className="grid grid-cols-4 gap-4 mb-8">
+                  {stats.map((stat, index) => (
                     <GlobalStatsCard
-                      key={stat.title}
+                      key={index}
                       title={stat.title}
                       value={stat.value}
                       description={stat.description}
