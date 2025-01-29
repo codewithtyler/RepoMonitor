@@ -79,7 +79,7 @@ export function AuthCallback() {
         }
 
         setStatus('Storing GitHub token...');
-        await GitHubTokenManager.handleOAuthToken(session.provider_token, user.id);
+        await GitHubTokenManager.storeToken(user.id, session.provider_token);
         console.log('[Auth] Token stored successfully');
 
         setStatus('Success! Redirecting to dashboard...');
