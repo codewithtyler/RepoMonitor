@@ -14,7 +14,9 @@ interface TokenData {
 
 export class GitHubTokenManager {
   private static validateToken(token: string): boolean {
-    return token.startsWith('gho_') && token.length >= 40;
+    // GitHub OAuth tokens are 40 characters long
+    // Fine-grained tokens start with 'gho_' and are at least 40 characters
+    return token.length >= 40;
   }
 
   static async storeToken(userId: string, token: string): Promise<void> {

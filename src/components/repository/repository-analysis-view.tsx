@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { IssueProcessor } from './issue-processor';
 import { ResultsDisplay } from '../analysis/results-display';
+import { ActiveAnalysisCard } from './active-analysis-card';
 import { theme } from '@/config/theme';
 
 interface DuplicateIssue {
@@ -115,23 +116,32 @@ export function RepositoryAnalysisView({ owner, name }: RepositoryAnalysisViewPr
         </div>
       </div>
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-bold" style={{ color: theme.colors.text.primary }}>
-          Issue Analysis
-        </h2>
-        <IssueProcessor
-          repositoryId={repository.github_id}
-          owner={repository.owner}
-          name={repository.name}
-          onJobUpdate={setActiveJob}
-          onDuplicateCountChange={setDuplicateCount}
-        />
-        {activeJob && (
-          <ResultsDisplay
-            issues={activeJob.results}
-            repositoryUrl={repository.url}
-          />
-        )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold" style={{ color: theme.colors.text.primary }}>
+              Issue Analysis
+            </h2>
+            <IssueProcessor
+              repositoryId={repository.github_id}
+              owner={repository.owner}
+              name={repository.name}
+              onJobUpdate={setActiveJob}
+              onDuplicateCountChange={setDuplicateCount}
+            />
+            {activeJob && activeJob.results && (
+              <ResultsDisplay
+                issues={activeJob.results}
+                repositoryUrl={repository.url}
+              />
+            )}
+          </div>
+        </div>
+        <div>
+          {activeJob && (
+            <ActiveAnalysisCard job={activeJob} />
+          )}
+        </div>
       </div>
     </div>
   );
