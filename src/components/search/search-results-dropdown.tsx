@@ -99,7 +99,7 @@ export function SearchResultsDropdown({
             <Star className="h-4 w-4" />
             <span className="text-xs">{repo.stargazersCount}</span>
           </div>
-          {isRecent ? (
+          {isRecent && (
             <button
               type="button"
               onClick={(e) => {
@@ -112,34 +112,34 @@ export function SearchResultsDropdown({
             >
               <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onTrackRepository(repo);
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-md text-xs"
-              style={{
-                backgroundColor: theme.colors.brand.primary,
-                color: theme.colors.text.primary
-              }}
-              aria-label="Track repository"
-            >
-              Track
-            </button>
           )}
         </div>
       </div>
     </div>
   );
 
+  const renderBatchSeparator = () => (
+    <div className="px-3 py-2">
+      <div className="w-full h-px" style={{ backgroundColor: theme.colors.border.primary }} />
+    </div>
+  );
+
+  const renderResults = (repos: SearchResult[], isOwned: boolean = false) => {
+    return repos.reduce((acc: JSX.Element[], repo, index) => {
+      if (!isOwned && index > 0 && index % DISPLAY_BATCH_SIZE === 0) {
+        acc.push(renderBatchSeparator());
+      }
+      acc.push(renderRepositoryItem(repo, false));
+      return acc;
+    }, []);
+  };
+
   return (
     <div
       ref={dropdownRef}
       className="absolute z-10 w-full mt-1 rounded-md shadow-lg max-h-[24rem] overflow-y-auto"
       style={{ backgroundColor: theme.colors.background.secondary }}
+      onScroll={handleScroll}
     >
       <div className="py-2">
         {query ? (
@@ -154,34 +154,27 @@ export function SearchResultsDropdown({
                       Owned
                     </div>
                   </div>
-                  {results
-                    .filter(repo => repo.owner === currentUser)
-                    .map(repo => renderRepositoryItem(repo, false))}
+                  {renderResults(results.filter(repo => repo.owner === currentUser), true)}
                 </>
               )}
 
               {/* Other Repositories */}
               {results.filter(repo => repo.owner !== currentUser).length > 0 && (
                 <>
-                  {results.filter(repo => repo.owner === currentUser).length > 0 && (
-                    <div className="relative px-3 py-2">
-                      <div className="absolute inset-0 flex items-center px-3">
-                        <div className="w-full h-px" style={{ backgroundColor: theme.colors.border.primary }} />
-                      </div>
-                      <div className="relative flex justify-center">
-                        <span className="px-2 text-xs font-medium" style={{
-                          color: theme.colors.text.secondary,
-                          backgroundColor: theme.colors.background.secondary
-                        }}>
-                          All Results
-                        </span>
-                      </div>
+                  <div className="relative px-3 py-2">
+                    <div className="absolute inset-0 flex items-center px-3">
+                      <div className="w-full h-px" style={{ backgroundColor: theme.colors.border.primary }} />
                     </div>
-                  )}
-                  {results
-                    .filter(repo => repo.owner !== currentUser)
-                    .slice(0, DISPLAY_BATCH_SIZE - results.filter(repo => repo.owner === currentUser).length)
-                    .map(repo => renderRepositoryItem(repo, false))}
+                    <div className="relative flex justify-center">
+                      <span className="px-2 text-xs font-medium" style={{
+                        color: theme.colors.text.secondary,
+                        backgroundColor: theme.colors.background.secondary
+                      }}>
+                        All Results
+                      </span>
+                    </div>
+                  </div>
+                  {renderResults(results.filter(repo => repo.owner !== currentUser))}
                 </>
               )}
             </>

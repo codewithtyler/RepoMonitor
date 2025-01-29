@@ -1,17 +1,18 @@
-import { useState, useRef } from 'react';
-import { Search } from 'lucide-react';
-import { theme } from '@/config/theme';
-import { SearchResultsDropdown } from './search-results-dropdown';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearch } from '@/lib/contexts/search-context';
 import { useUser } from '@/lib/auth/hooks';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { supabase } from '@/lib/auth/supabase-client';
 import { createNotification } from '@/lib/hooks/use-notifications';
 import type { SearchResult } from '@/lib/contexts/search-context';
+import { Spinner } from '@/components/common/spinner';
+import { SearchResultsDropdown } from './search-results-dropdown';
+import { useAnalysis } from '@/lib/contexts/analysis-context';
 
 export function SearchBar() {
   const { user } = useUser();
   const { client, withGitHub } = useGitHub();
+  const { selectRepository } = useAnalysis();
   const {
     query,
     setQuery,
@@ -24,10 +25,13 @@ export function SearchBar() {
     hasMore,
     loadMore,
     selectResult,
-    selectRecentSearch
+    selectRecentSearch,
+    search,
+    clearSearch
   } = useSearch();
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const handleTrackRepository = async (repo: SearchResult) => {
     if (!user || !client) return;
@@ -39,7 +43,8 @@ export function SearchBar() {
         return {
           hasAccess: true,
           isPrivate: repoData.visibility === 'private',
-          permissions: repoData.permissions
+          permissions: repoData.permissions,
+          repoData
         };
       });
 
@@ -60,16 +65,27 @@ export function SearchBar() {
       const { error } = await supabase
         .from('repositories')
         .upsert({
+          id: repo.id,
           github_id: repo.id,
           name: repo.name,
           owner: repo.owner,
-          repository_permissions: access.permissions,
+          repository_permissions: {
+            admin: access.permissions?.admin || false,
+            push: access.permissions?.push || false,
+            pull: access.permissions?.pull || false,
+            private: access.isPrivate,
+            public: !access.isPrivate
+          },
           last_analysis_timestamp: null,
-          analyzed_by_user_id: null,
-          is_public: !access.isPrivate
+          analyzed_by_user_id: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error tracking repository:', error);
+        throw error;
+      }
 
       await createNotification({
         userId: user.id,
@@ -84,6 +100,7 @@ export function SearchBar() {
       // Close the dropdown
       setIsOpen(false);
     } catch (error) {
+      console.error('Error in handleTrackRepository:', error);
       await createNotification({
         userId: user.id,
         title: 'Repository Tracking Error',
@@ -97,29 +114,66 @@ export function SearchBar() {
     }
   };
 
+  const handleSelect = (result: SearchResult) => {
+    selectResult(result);
+    selectRepository(result);
+    setIsOpen(false);
+  };
+
+  const handleSelectRecentSearch = (result: SearchResult) => {
+    selectRecentSearch(result);
+    selectRepository(result);
+    setIsOpen(false);
+  };
+
+  const handleBlur = useCallback((event: React.FocusEvent) => {
+    // Check if the related target is within the search container
+    const isWithinContainer = searchContainerRef.current?.contains(event.relatedTarget as Node);
+    if (!isWithinContainer) {
+      setIsOpen(false);
+      setQuery(''); // Clear the input when focus is lost
+      clearSearch(); // Clear the search results
+    }
+  }, [setQuery, clearSearch]);
+
+  const handleFocus = useCallback(() => {
+    setIsOpen(true);
+  }, []);
+
+  // Add effect to trigger search when query changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (query.trim()) {
+        search(query);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [query, search]);
+
   return (
-    <div className="relative w-full">
+    <div
+      ref={searchContainerRef}
+      className="relative w-full"
+    >
       <div className="relative">
         <input
           ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsOpen(true)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder="Search repositories..."
-          className="w-full px-4 py-2 pl-10 rounded-lg"
-          style={{
-            backgroundColor: theme.colors.background.secondary,
-            color: theme.colors.text.primary,
-            border: `1px solid ${theme.colors.border.primary}`
-          }}
+          className="w-full px-4 py-2 text-sm bg-transparent border rounded-md border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          aria-label="Search repositories"
         />
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2"
-          style={{ color: theme.colors.text.secondary }}
-        />
+        {loading && (
+          <div className="absolute right-3 top-2.5">
+            <Spinner size="sm" />
+          </div>
+        )}
       </div>
-
       {isOpen && (
         <SearchResultsDropdown
           query={query}
@@ -127,20 +181,21 @@ export function SearchBar() {
           loading={loading}
           error={error}
           recentSearches={recentSearches}
-          onSelect={(result) => {
-            selectResult(result);
-            setIsOpen(false);
-          }}
-          onSelectRecentSearch={(result) => {
-            selectRecentSearch(result);
-            setIsOpen(false);
-          }}
+          onSelect={handleSelect}
+          onSelectRecentSearch={handleSelectRecentSearch}
           onRemoveRecentSearch={removeRecentSearch}
           onClearRecentSearches={clearRecentSearches}
           hasMore={hasMore}
           onLoadMore={loadMore}
           onTrackRepository={handleTrackRepository}
         />
+      )}
+      {isOpen && query.trim().length > 0 && query.trim().length < 3 && (
+        <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden bg-background-secondary">
+          <div className="px-3 py-2 text-sm text-text-secondary">
+            Please enter at least 3 characters to search
+          </div>
+        </div>
       )}
     </div>
   );

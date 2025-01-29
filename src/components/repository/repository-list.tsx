@@ -28,9 +28,15 @@ export function RepositoryList({ repositories, title }: Props) {
 
     try {
       // Check if we have access and get permissions
-      const access = await useGitHub((client: GitHubClient) =>
-        client.checkRepositoryAccess(repo.owner.login, repo.name)
-      );
+      const access = await useGitHub(async (client: GitHubClient) => {
+        const repoData = await client.getRepository(repo.owner, repo.name);
+        return {
+          hasAccess: true,
+          isPrivate: repoData.visibility === 'private',
+          permissions: repoData.permissions,
+          repoData
+        };
+      });
 
       if (!access?.hasAccess) {
         await createNotification({
@@ -39,7 +45,7 @@ export function RepositoryList({ repositories, title }: Props) {
           message: 'You no longer have access to this repository.',
           type: 'SYSTEM_ERROR',
           metadata: {
-            repository: `${repo.owner.login}/${repo.name}`
+            repository: `${repo.owner}/${repo.name}`
           }
         });
         return;
@@ -49,24 +55,35 @@ export function RepositoryList({ repositories, title }: Props) {
       const { error } = await supabase
         .from('repositories')
         .upsert({
+          id: repo.id,
           github_id: repo.id,
           name: repo.name,
-          owner: repo.owner.login,
-          repository_permissions: access.permissions,
+          owner: repo.owner,
+          repository_permissions: {
+            admin: access.permissions?.admin || false,
+            push: access.permissions?.push || false,
+            pull: access.permissions?.pull || false,
+            private: access.isPrivate,
+            public: !access.isPrivate
+          },
           last_analysis_timestamp: null,
-          analyzed_by_user_id: null,
-          is_public: !access.isPrivate
+          analyzed_by_user_id: user.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error tracking repository:', error);
+        throw error;
+      }
 
       await createNotification({
         userId: user.id,
         title: 'Repository Tracked',
-        message: `Now tracking ${repo.owner.login}/${repo.name}`,
+        message: `Now tracking ${repo.owner}/${repo.name}`,
         type: 'DATA_COLLECTION_COMPLETE',
         metadata: {
-          repository: `${repo.owner.login}/${repo.name}`
+          repository: `${repo.owner}/${repo.name}`
         }
       });
 
@@ -77,15 +94,16 @@ export function RepositoryList({ repositories, title }: Props) {
       });
 
       // Navigate to analysis page
-      navigate(`/analyze/${repo.owner.login}/${repo.name}`);
+      navigate(`/analyze/${repo.owner}/${repo.name}`);
     } catch (error) {
+      console.error('Error in trackRepository:', error);
       await createNotification({
         userId: user.id,
         title: 'Repository Tracking Error',
         message: 'Failed to track repository. Please try again.',
         type: 'SYSTEM_ERROR',
         metadata: {
-          repository: `${repo.owner.login}/${repo.name}`,
+          repository: `${repo.owner}/${repo.name}`,
           error: error instanceof Error ? error.message : 'Unknown error'
         }
       });
