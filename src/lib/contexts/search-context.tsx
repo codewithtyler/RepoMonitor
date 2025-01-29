@@ -17,7 +17,7 @@ export interface SearchResult {
   isAnalyzing?: boolean;
 }
 
-interface SearchContextType {
+export interface SearchContextType {
   query: string;
   setQuery: (query: string) => void;
   results: SearchResult[];
@@ -26,14 +26,13 @@ interface SearchContextType {
   recentSearches: SearchResult[];
   removeRecentSearch: (id: number) => void;
   clearRecentSearches: () => void;
-  search: (searchQuery: string) => Promise<void>;
   hasMore: boolean;
-  loadMore: () => Promise<void>;
-  addToRecentSearches: (result: SearchResult) => void;
-  clearSearch: () => void;
+  loadMore: () => void;
+  selectResult: (result: SearchResult) => void;
+  selectRecentSearch: (result: SearchResult) => void;
 }
 
-const SearchContext = createContext<SearchContextType | null>(null);
+export const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 const MAX_RECENT_SEARCHES = 5;
 const INITIAL_PAGE_SIZE = 30;  // Initial fetch size
@@ -81,6 +80,20 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>(getRecentSearches());
   const [hasMore, setHasMore] = useState(false);
   const searchCacheRef = useRef<CachedResults | null>(null);
+
+  const selectResult = useCallback((result: SearchResult) => {
+    setRecentSearches(prev => {
+      const filtered = prev.filter(r => r.id !== result.id);
+      return [result, ...filtered].slice(0, 5);
+    });
+  }, []);
+
+  const selectRecentSearch = useCallback((result: SearchResult) => {
+    setRecentSearches(prev => {
+      const filtered = prev.filter(r => r.id !== result.id);
+      return [result, ...filtered];
+    });
+  }, []);
 
   const addToRecentSearches = useCallback((result: SearchResult) => {
     setRecentSearches(prev => {
@@ -208,24 +221,23 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     saveRecentSearches([]);
   }, []);
 
+  const value = {
+    query,
+    setQuery,
+    results,
+    loading,
+    error,
+    recentSearches,
+    removeRecentSearch,
+    clearRecentSearches,
+    hasMore,
+    loadMore,
+    selectResult,
+    selectRecentSearch
+  };
+
   return (
-    <SearchContext.Provider
-      value={{
-        query,
-        setQuery,
-        results: displayedResults,
-        loading,
-        error,
-        recentSearches,
-        removeRecentSearch,
-        clearRecentSearches,
-        search,
-        hasMore,
-        loadMore,
-        addToRecentSearches,
-        clearSearch
-      }}
-    >
+    <SearchContext.Provider value={value}>
       {children}
     </SearchContext.Provider>
   );

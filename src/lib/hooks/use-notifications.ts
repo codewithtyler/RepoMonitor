@@ -107,3 +107,29 @@ export function useNotifications() {
         unreadCount: notifications.filter(n => !n.is_read).length
     };
 }
+
+export async function createNotification(data: {
+    userId: string;
+    title: string;
+    message: string;
+    type: NotificationType;
+    metadata?: Record<string, any>;
+}) {
+    try {
+        const { error } = await supabase
+            .from('notifications')
+            .insert({
+                user_id: data.userId,
+                title: data.title,
+                message: data.message,
+                type: data.type,
+                metadata: data.metadata || {},
+                is_read: false
+            });
+
+        if (error) throw error;
+    } catch (error) {
+        logger.error('Error creating notification:', error);
+        throw error;
+    }
+}

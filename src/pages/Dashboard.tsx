@@ -10,11 +10,21 @@ import { UserProfile } from '@/components/common/user-profile';
 import { RepositoryDetailView } from '@/components/repository/repository-detail-view';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { theme } from '@/config/theme';
+import { useTrackedRepositories } from '@/lib/hooks/use-tracked-repositories';
+import { useGitHub } from '@/lib/hooks/use-github';
+import { supabase } from '@/lib/auth/supabase-client';
+import { toast } from '@/hooks/use-toast';
+import { GitFork } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { GitHubClient } from '@/lib/github';
 
 export function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
   const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis();
+  const { data: trackedData } = useTrackedRepositories();
+  const { withGitHub } = useGitHub();
+  const queryClient = useQueryClient();
 
   const filteredRepositories = repositories?.filter(repo => {
     if (!searchQuery) return true;
@@ -23,6 +33,55 @@ export function Dashboard() {
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
     selectRepository(repository);
+  };
+
+  const handleTrackRepository = async () => {
+    if (!selectedRepository) return;
+
+    try {
+      // Check if we have access and get permissions
+      const access = await withGitHub((client: GitHubClient) =>
+        client.getRepository(selectedRepository.owner, selectedRepository.name)
+      );
+
+      if (!access) {
+        toast({
+          title: 'Access Error',
+          description: 'You no longer have access to this repository.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Add repository to tracking
+      const { error } = await supabase
+        .from('repositories')
+        .upsert({
+          github_id: access.id,
+          name: selectedRepository.name,
+          owner: selectedRepository.owner,
+          repository_permissions: access.permissions,
+          last_analysis_timestamp: null,
+          analyzed_by_user_id: null,
+          is_public: access.visibility === 'public'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Repository Added',
+        description: `Now tracking ${selectedRepository.owner}/${selectedRepository.name}`,
+      });
+
+      // Refetch tracked repositories to update the count
+      await queryClient.invalidateQueries({ queryKey: ['tracked-repositories'] });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to track repository. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   if (isLoading) {
@@ -95,8 +154,8 @@ export function Dashboard() {
   const stats = [
     {
       title: 'Total Repositories',
-      value: repositories?.length || 0,
-      description: 'Total number of repositories',
+      value: trackedData?.count || 0,
+      description: 'Total number of tracked repositories',
       layoutOrder: 1
     },
     {
@@ -226,6 +285,16 @@ export function Dashboard() {
           style={{ borderColor: theme.colors.border.primary }}
         >
           <div className="p-4 space-y-4">
+            {/* Track Repository Button */}
+            <button
+              onClick={handleTrackRepository}
+              className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors hover:opacity-80"
+              style={{ backgroundColor: theme.colors.brand.primary, color: theme.colors.text.inverse }}
+            >
+              <GitFork className="h-4 w-4" />
+              Track Repository
+            </button>
+
             <h2 className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
               Global Stats
             </h2>

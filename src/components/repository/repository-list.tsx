@@ -1,6 +1,16 @@
 import { useRepositorySelection } from '@/lib/hooks/use-repository-selection';
 import type { Repository } from '@/lib/hooks/use-repository-data';
 import { theme } from '@/config/theme';
+import { useState, useEffect } from 'react';
+import { useGitHub } from '@/lib/hooks/use-github';
+import { Plus, Trash2, Star, GitBranch } from 'lucide-react';
+import { supabase } from '@/lib/auth/supabase-client';
+import type { GitHubClient } from '@/lib/github';
+import { useNavigate } from 'react-router-dom';
+import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { useSearch } from '@/lib/contexts/search-context';
+import { useUser } from '@/lib/auth/hooks';
+import { createNotification } from '@/lib/hooks/use-notifications';
 
 interface Props {
   repositories: Repository[];
@@ -9,6 +19,78 @@ interface Props {
 
 export function RepositoryList({ repositories, title }: Props) {
   const { handleRepositorySelect } = useRepositorySelection();
+  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
+  const navigate = useNavigate();
+  const user = useUser();
+
+  const trackRepository = async (repo: Repository) => {
+    if (!user) return;
+
+    try {
+      // Check if we have access and get permissions
+      const access = await useGitHub((client: GitHubClient) =>
+        client.checkRepositoryAccess(repo.owner.login, repo.name)
+      );
+
+      if (!access?.hasAccess) {
+        await createNotification({
+          userId: user.id,
+          title: 'Repository Access Error',
+          message: 'You no longer have access to this repository.',
+          type: 'SYSTEM_ERROR',
+          metadata: {
+            repository: `${repo.owner.login}/${repo.name}`
+          }
+        });
+        return;
+      }
+
+      // Add repository to tracking
+      const { error } = await supabase
+        .from('repositories')
+        .upsert({
+          github_id: repo.id,
+          name: repo.name,
+          owner: repo.owner.login,
+          repository_permissions: access.permissions,
+          last_analysis_timestamp: null,
+          analyzed_by_user_id: null,
+          is_public: !access.isPrivate
+        });
+
+      if (error) throw error;
+
+      await createNotification({
+        userId: user.id,
+        title: 'Repository Tracked',
+        message: `Now tracking ${repo.owner.login}/${repo.name}`,
+        type: 'DATA_COLLECTION_COMPLETE',
+        metadata: {
+          repository: `${repo.owner.login}/${repo.name}`
+        }
+      });
+
+      setSelectedRepos(prev => {
+        const next = new Set(prev);
+        next.add(repo.id);
+        return next;
+      });
+
+      // Navigate to analysis page
+      navigate(`/analyze/${repo.owner.login}/${repo.name}`);
+    } catch (error) {
+      await createNotification({
+        userId: user.id,
+        title: 'Repository Tracking Error',
+        message: 'Failed to track repository. Please try again.',
+        type: 'SYSTEM_ERROR',
+        metadata: {
+          repository: `${repo.owner.login}/${repo.name}`,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  };
 
   if (repositories.length === 0) {
     return (

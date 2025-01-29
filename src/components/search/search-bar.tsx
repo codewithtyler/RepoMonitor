@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { useSearch, type SearchResult } from '@/lib/contexts/search-context';
-import { useRepositorySelection } from '@/lib/hooks/use-repository-selection';
-import { SearchResultsDropdown } from './search-results-dropdown';
+import { useState, useRef } from 'react';
+import { Search } from 'lucide-react';
 import { theme } from '@/config/theme';
+import { SearchResultsDropdown } from './search-results-dropdown';
+import { useSearch } from '@/lib/contexts/search-context';
+import { useUser } from '@/lib/auth/hooks';
+import { useGitHub } from '@/lib/hooks/use-github';
+import { supabase } from '@/lib/auth/supabase-client';
+import { createNotification } from '@/lib/hooks/use-notifications';
+import type { SearchResult } from '@/lib/contexts/search-context';
 
-interface Props {
-  placeholder?: string;
-  value: string;
-  onChange: (value: string) => void;
-  autoFocus?: boolean;
-}
-
-export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocus }: Props) {
-  const [showDropdown, setShowDropdown] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { handleRepositorySelect } = useRepositorySelection();
+export function SearchBar() {
+  const { user } = useUser();
+  const { client, withGitHub } = useGitHub();
   const {
     query,
     setQuery,
@@ -24,103 +21,125 @@ export function SearchBar({ placeholder = 'Search...', value, onChange, autoFocu
     recentSearches,
     removeRecentSearch,
     clearRecentSearches,
-    search,
     hasMore,
     loadMore,
-    addToRecentSearches,
-    clearSearch
+    selectResult,
+    selectRecentSearch
   } = useSearch();
+  const [isOpen, setIsOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-        clearSearch();
-        onChange('');
+  const handleTrackRepository = async (repo: SearchResult) => {
+    if (!user || !client) return;
+
+    try {
+      // Check if we have access and get permissions
+      const access = await withGitHub(async (client) => {
+        const repoData = await client.getRepository(repo.owner, repo.name);
+        return {
+          hasAccess: true,
+          isPrivate: repoData.visibility === 'private',
+          permissions: repoData.permissions
+        };
+      });
+
+      if (!access?.hasAccess) {
+        await createNotification({
+          userId: user.id,
+          title: 'Repository Access Error',
+          message: 'You no longer have access to this repository.',
+          type: 'SYSTEM_ERROR',
+          metadata: {
+            repository: `${repo.owner}/${repo.name}`
+          }
+        });
+        return;
       }
-    };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [clearSearch, onChange]);
+      // Add repository to tracking
+      const { error } = await supabase
+        .from('repositories')
+        .upsert({
+          github_id: repo.id,
+          name: repo.name,
+          owner: repo.owner,
+          repository_permissions: access.permissions,
+          last_analysis_timestamp: null,
+          analyzed_by_user_id: null,
+          is_public: !access.isPrivate
+        });
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = event.target.value;
-    onChange(newValue);
-    setQuery(newValue);
+      if (error) throw error;
 
-    if (newValue.length >= 3) {
-      search(newValue);
-      setShowDropdown(true);
-    } else {
-      setShowDropdown(newValue.length > 0);
-    }
-  };
+      await createNotification({
+        userId: user.id,
+        title: 'Repository Tracked',
+        message: `Now tracking ${repo.owner}/${repo.name}`,
+        type: 'DATA_COLLECTION_COMPLETE',
+        metadata: {
+          repository: `${repo.owner}/${repo.name}`
+        }
+      });
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && query.length >= 3) {
-      search(query);
-      setShowDropdown(true);
-    }
-  };
-
-  const handleSelect = (result: SearchResult) => {
-    onChange(`${result.owner}/${result.name}`);
-    setShowDropdown(false);
-    addToRecentSearches(result);
-    clearSearch();
-    handleRepositorySelect(result);
-  };
-
-  const handleSelectRecentSearch = (result: SearchResult) => {
-    onChange(`${result.owner}/${result.name}`);
-    setQuery(`${result.owner}/${result.name}`);
-    setShowDropdown(false);
-    search(`${result.owner}/${result.name}`);
-    handleRepositorySelect(result);
-  };
-
-  const handleFocus = () => {
-    if (value || (recentSearches && recentSearches.length > 0)) {
-      setShowDropdown(true);
-    }
-    if (!value) {
-      clearSearch();
+      // Close the dropdown
+      setIsOpen(false);
+    } catch (error) {
+      await createNotification({
+        userId: user.id,
+        title: 'Repository Tracking Error',
+        message: 'Failed to track repository. Please try again.',
+        type: 'SYSTEM_ERROR',
+        metadata: {
+          repository: `${repo.owner}/${repo.name}`,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
     }
   };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative w-full">
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
-          value={value}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          className="w-full px-4 py-2 text-sm rounded-lg border focus:outline-none focus:ring-2"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          placeholder="Search repositories..."
+          className="w-full px-4 py-2 pl-10 rounded-lg"
           style={{
             backgroundColor: theme.colors.background.secondary,
-            borderColor: theme.colors.border.primary,
             color: theme.colors.text.primary,
+            border: `1px solid ${theme.colors.border.primary}`
           }}
         />
+        <Search
+          className="absolute left-3 top-1/2 transform -translate-y-1/2"
+          style={{ color: theme.colors.text.secondary }}
+        />
       </div>
-      {showDropdown && (
+
+      {isOpen && (
         <SearchResultsDropdown
           query={query}
           results={results}
           loading={loading}
           error={error}
           recentSearches={recentSearches}
-          onSelect={handleSelect}
-          onSelectRecentSearch={handleSelectRecentSearch}
+          onSelect={(result) => {
+            selectResult(result);
+            setIsOpen(false);
+          }}
+          onSelectRecentSearch={(result) => {
+            selectRecentSearch(result);
+            setIsOpen(false);
+          }}
           onRemoveRecentSearch={removeRecentSearch}
           onClearRecentSearches={clearRecentSearches}
           hasMore={hasMore}
           onLoadMore={loadMore}
+          onTrackRepository={handleTrackRepository}
         />
       )}
     </div>

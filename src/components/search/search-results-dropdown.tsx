@@ -18,6 +18,7 @@ interface Props {
   onClearRecentSearches: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
+  onTrackRepository: (repo: SearchResult) => void;
 }
 
 export function SearchResultsDropdown({
@@ -32,6 +33,7 @@ export function SearchResultsDropdown({
   onClearRecentSearches,
   hasMore,
   onLoadMore,
+  onTrackRepository
 }: Props) {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -74,10 +76,18 @@ export function SearchResultsDropdown({
   }
 
   const renderRepositoryItem = (repo: SearchResult, isRecent: boolean) => (
-    <button
+    <div
       key={repo.id}
       onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
-      className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          isRecent ? onSelectRecentSearch(repo) : onSelect(repo);
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group cursor-pointer"
     >
       <div className="flex items-center justify-between">
         <div className="truncate">
@@ -89,7 +99,7 @@ export function SearchResultsDropdown({
             <Star className="h-4 w-4" />
             <span className="text-xs">{repo.stargazersCount}</span>
           </div>
-          {isRecent && (
+          {isRecent ? (
             <button
               type="button"
               onClick={(e) => {
@@ -98,13 +108,31 @@ export function SearchResultsDropdown({
                 onRemoveRecentSearch(repo.id);
               }}
               className="opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Remove from recent searches"
             >
               <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onTrackRepository(repo);
+              }}
+              className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-md text-xs"
+              style={{
+                backgroundColor: theme.colors.brand.primary,
+                color: theme.colors.text.primary
+              }}
+              aria-label="Track repository"
+            >
+              Track
             </button>
           )}
         </div>
       </div>
-    </button>
+    </div>
   );
 
   return (
