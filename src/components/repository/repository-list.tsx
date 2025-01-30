@@ -1,6 +1,6 @@
 import type { Repository } from '@/lib/hooks/use-repository-data';
 import type { SearchResult } from '@/lib/contexts/search-context';
-import { Star, GitFork, AlertCircle, Lock } from 'lucide-react';
+import { Star, GitFork, AlertCircle } from 'lucide-react';
 
 interface RepositoryListProps {
   repositories: Repository[];

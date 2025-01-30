@@ -3,8 +3,13 @@ import { useSearch } from '@/lib/contexts/search-context';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import type { SearchResult } from '@/lib/contexts/search-context';
+import { cn } from '@/lib/utils';
 
-export const SearchBar = () => {
+interface SearchBarProps {
+  className?: string;
+}
+
+export const SearchBar = ({ className }: SearchBarProps) => {
   const [query, setQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isInteractingWithDropdown, setIsInteractingWithDropdown] = useState(false);
@@ -78,7 +83,7 @@ export const SearchBar = () => {
   return (
     <div
       ref={searchContainerRef}
-      className="relative w-full"
+      className={cn("relative w-full", className)}
     >
       <div className="relative">
         <input

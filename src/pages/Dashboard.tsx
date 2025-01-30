@@ -12,7 +12,6 @@ import { NotificationDropdown } from '@/components/common/notification-dropdown'
 import { UserProfile } from '@/components/common/user-profile';
 import { GitHubLoginButton } from '@/components/auth/github-login-button';
 import { OpenWithModal } from '@/components/repository/open-with-modal';
-import { useNavigate } from 'react-router-dom';
 import { ExternalLink } from 'lucide-react';
 
 export function Dashboard() {
@@ -25,7 +24,6 @@ export function Dashboard() {
   };
   const [trackedRepositories, setTrackedRepositories] = useState<Repository[]>([]);
   const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
-  const navigate = useNavigate();
 
   // Load tracked repositories from localStorage
   useEffect(() => {
@@ -41,15 +39,6 @@ export function Dashboard() {
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
     selectRepository(repository);
-  };
-
-  const handleStartAnalysis = async () => {
-    if (!selectedRepository) return;
-    try {
-      // Implement analysis logic here
-    } catch (error) {
-      console.error('Failed to start analysis:', error);
-    }
   };
 
   const handleOpenWith = () => {

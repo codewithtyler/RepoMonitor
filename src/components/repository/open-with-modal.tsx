@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 interface OpenWithModalProps {
     isOpen: boolean;
     onClose: () => void;
-    repositoryUrl: string;
+    repositoryUrl: string; // Keep this for future use
 }
 
-export function OpenWithModal({ isOpen, onClose, repositoryUrl }: OpenWithModalProps) {
+export function OpenWithModal({ isOpen, onClose }: OpenWithModalProps) {
     if (!isOpen) return null;
     const navigate = useNavigate();
 
-    const handleOpenWith = (service: 'bolt' | 'cursor') => {
+    const handleOpenWith = () => {
         onClose();
         navigate('/work-in-progress');
     };
@@ -21,13 +21,13 @@ export function OpenWithModal({ isOpen, onClose, repositoryUrl }: OpenWithModalP
                 <h2 className="text-lg font-medium text-[#c9d1d9] mb-4">Open With</h2>
                 <div className="space-y-3">
                     <button
-                        onClick={() => handleOpenWith('bolt')}
+                        onClick={handleOpenWith}
                         className="w-full px-4 py-2 rounded-md flex items-center justify-center bg-[#0078d4] text-white hover:bg-[#0086ef] transition-colors font-medium"
                     >
                         Open in Bolt
                     </button>
                     <button
-                        onClick={() => handleOpenWith('cursor')}
+                        onClick={handleOpenWith}
                         className="w-full px-4 py-2 rounded-md flex items-center justify-center bg-[#1c1c1c] text-white hover:bg-[#2a2a2a] transition-colors font-medium"
                     >
                         Open in Cursor

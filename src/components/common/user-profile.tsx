@@ -1,6 +1,5 @@
 import { useAuth } from '@/lib/contexts/auth-context';
 import { useUser } from '@/lib/auth/hooks';
-import { Button } from '@/components/common/button';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
