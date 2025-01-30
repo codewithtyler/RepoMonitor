@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/lib/contexts/auth-context';
 import type { Repository } from '@/lib/hooks/use-repository-data';
 import type { SearchResult } from '@/lib/contexts/search-context';
@@ -13,29 +13,19 @@ import { UserProfile } from '@/components/common/user-profile';
 import { GitHubLoginButton } from '@/components/auth/github-login-button';
 import { OpenWithModal } from '@/components/repository/open-with-modal';
 import { ExternalLink } from 'lucide-react';
+import { useTrackedRepositories } from '@/lib/hooks/use-tracked-repositories';
 
 export function Dashboard() {
   const { user, loading: authLoading } = useAuth();
-  const { data: repositories, isLoading, error } = useRepositoriesData();
+  const { isLoading, error } = useRepositoriesData();
+  const { data: trackedRepositoriesData } = useTrackedRepositories();
+  const trackedRepositories = trackedRepositoriesData?.repositories || [];
   const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis() as {
     selectedRepository: Repository | null;
     recentlyAnalyzed: Repository[];
     selectRepository: (repo: Repository | SearchResult | null) => void;
   };
-  const [trackedRepositories, setTrackedRepositories] = useState<Repository[]>([]);
   const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
-
-  // Load tracked repositories from localStorage
-  useEffect(() => {
-    const loadTrackedRepos = () => {
-      const tracked = JSON.parse(localStorage.getItem('trackedRepositories') || '[]');
-      setTrackedRepositories(tracked);
-    };
-
-    loadTrackedRepos();
-    window.addEventListener('storage', loadTrackedRepos);
-    return () => window.removeEventListener('storage', loadTrackedRepos);
-  }, []);
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
     selectRepository(repository);
@@ -140,6 +130,9 @@ export function Dashboard() {
     );
   }
 
+  // Calculate open issues count only for tracked repositories
+  const openIssuesCount = trackedRepositories.reduce((total, repo) => total + (repo.openIssuesCount || 0), 0);
+
   const stats = [
     {
       title: 'Total Repositories',
@@ -148,8 +141,8 @@ export function Dashboard() {
       layoutOrder: 1
     },
     {
-      title: 'Open Issues',
-      value: repositories?.reduce((total, repo) => total + (repo.openIssuesCount || 0), 0) || 0,
+      title: 'Global Open Issues',
+      value: openIssuesCount,
       description: 'Across all tracked repositories',
       layoutOrder: 2
     },
@@ -248,12 +241,10 @@ export function Dashboard() {
         <div className="flex-1 p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {selectedRepository ? (
-              <>
-                <RepositoryDetailView
-                  repository={selectedRepository}
-                  onBack={() => selectRepository(null)}
-                />
-              </>
+              <RepositoryDetailView
+                repository={selectedRepository}
+                onBack={() => selectRepository(null)}
+              />
             ) : (
               <>
                 {/* Stats Grid for Dashboard View */}
@@ -342,4 +333,3 @@ export function Dashboard() {
     </div>
   );
 }
-
