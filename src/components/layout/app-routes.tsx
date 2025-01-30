@@ -3,6 +3,7 @@ import { Home } from '@/pages/Home';
 import { Dashboard } from '@/pages/Dashboard';
 import { AuthCallback } from '@/pages/auth/callback';
 import { ProtectedRoute } from '@/components/auth/protected-route';
+import { WorkInProgress } from '@/pages/WorkInProgress';
 
 export function AppRoutes() {
     return (
@@ -14,6 +15,7 @@ export function AppRoutes() {
                 </ProtectedRoute>
             } />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/work-in-progress" element={<WorkInProgress />} />
         </Routes>
     );
 }

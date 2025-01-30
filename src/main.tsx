@@ -22,23 +22,21 @@ const queryClient = new QueryClient({
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <>
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider defaultTheme="dark">
-          <AuthProvider>
-            <ActiveAnalysesProvider>
-              <AnalysisProvider>
-                <GitHubProvider>
-                  <SearchProvider>
-                    <App />
-                  </SearchProvider>
-                </GitHubProvider>
-              </AnalysisProvider>
-            </ActiveAnalysesProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
-  </>
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="dark">
+        <AuthProvider>
+          <ActiveAnalysesProvider>
+            <AnalysisProvider>
+              <GitHubProvider>
+                <SearchProvider>
+                  <App />
+                </SearchProvider>
+              </GitHubProvider>
+            </AnalysisProvider>
+          </ActiveAnalysesProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );

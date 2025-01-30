@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useUser } from '@/lib/auth/hooks';
 import { Loader2 } from 'lucide-react';
 
@@ -19,6 +19,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading } = useUser();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -29,7 +30,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    return <Navigate to="/" replace />;
+    // Pass the current location as state to redirect back after login
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/auth/supabase-client';
 import { useUser } from '@/lib/auth/hooks';
 import { logger } from '@/lib/utils/logger';
 import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
+import { useNavigate } from 'react-router-dom';
 
 type AuthContextType = {
     user: User | null;
@@ -25,6 +26,7 @@ const AuthContext = createContext<AuthContextType>(defaultContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { user, loading } = useUser();
+    const navigate = useNavigate();
 
     const signUp = async (email: string, password: string) => {
         try {
@@ -65,8 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
 
-            // Force reload the page to clear all in-memory state
-            window.location.href = '/';
+            // Navigate to home page using React Router
+            navigate('/', { replace: true });
         } catch (error) {
             logger.error('[AuthProvider] Sign out error:', error);
             throw error;
