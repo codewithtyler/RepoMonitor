@@ -15,6 +15,11 @@ export interface SearchResult {
   subscribersCount: number;
   lastAnalysisTimestamp?: string | null;
   isAnalyzing?: boolean;
+  isFork: boolean;
+  source?: {
+    owner: string;
+    name: string;
+  };
 }
 
 export interface SearchContextType {
@@ -39,8 +44,8 @@ export interface SearchContextType {
 export const SearchContext = createContext<SearchContextType | null>(null);
 
 const MAX_RECENT_SEARCHES = 5;
-const INITIAL_PAGE_SIZE = 30;  // Initial fetch size
-const DISPLAY_BATCH_SIZE = 10; // Number of items to show per batch
+const INITIAL_PAGE_SIZE = 100;  // Maximum results per page
+const DISPLAY_BATCH_SIZE = 30;  // Show 30 results at a time
 const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 const MIN_SEARCH_CHARS = 3; // Minimum characters required for search
 
@@ -137,14 +142,17 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
       }
 
       const client = await getGitHubClient(state.user.id);
+
+      // Get search results first
       const searchResults = await client.searchRepositories(searchQuery, {
         query: searchQuery,
         page: 1,
-        per_page: INITIAL_PAGE_SIZE, // This is fixed at 30
-        sort: 'stars',
+        per_page: INITIAL_PAGE_SIZE,
+        sort: 'updated',
         order: 'desc'
       });
 
+      // Format the results
       const formattedResults = searchResults.items.map(repo => ({
         id: repo.id,
         owner: repo.owner.login,
@@ -157,20 +165,42 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         openIssuesCount: repo.open_issues_count,
         subscribersCount: repo.subscribers_count || 0,
         lastAnalysisTimestamp: null,
-        isAnalyzing: false
+        isAnalyzing: false,
+        isFork: repo.fork || false,
+        source: repo.source ? {
+          owner: repo.source.owner.login,
+          name: repo.source.name
+        } : undefined
       }));
 
-      setResults(formattedResults);
+      // Remove duplicates and sort results
+      const uniqueResults = Array.from(new Map(formattedResults.map(item => [item.id, item])).values());
+      const sortedResults = uniqueResults.sort((a, b) => {
+        // First, prioritize user's repositories
+        const isUserRepoA = a.owner === currentUser;
+        const isUserRepoB = b.owner === currentUser;
+        if (isUserRepoA && !isUserRepoB) return -1;
+        if (!isUserRepoA && isUserRepoB) return 1;
+
+        // Then prioritize forks
+        if (a.isFork && !b.isFork) return -1;
+        if (!a.isFork && b.isFork) return 1;
+
+        // Finally sort by stars
+        return b.stargazersCount - a.stargazersCount;
+      });
+
+      setResults(sortedResults);
       setDisplayedCount(DISPLAY_BATCH_SIZE);
-      setHasMore(formattedResults.length > DISPLAY_BATCH_SIZE);
+      setHasMore(sortedResults.length > DISPLAY_BATCH_SIZE);
 
       // Update cache
       searchCacheRef.current = {
         query: searchQuery,
-        results: formattedResults,
+        results: sortedResults,
         displayedCount: DISPLAY_BATCH_SIZE,
         timestamp: Date.now(),
-        hasMore: formattedResults.length > DISPLAY_BATCH_SIZE,
+        hasMore: sortedResults.length > DISPLAY_BATCH_SIZE,
         page: 1
       };
     } catch (err) {
@@ -178,7 +208,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [clearSearch]);
+  }, [clearSearch, currentUser]);
 
   const selectResult = useCallback((result: SearchResult) => {
     setRecentSearches(prev => {

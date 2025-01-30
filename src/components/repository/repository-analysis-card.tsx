@@ -1,23 +1,24 @@
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { useRepositoriesData } from '@/lib/hooks/use-repository-data';
+import { useActiveAnalyses } from '@/lib/contexts/active-analyses-context';
 import { theme } from '@/config/theme';
 import { Loader2 } from 'lucide-react';
+import { useCallback } from 'react';
 
 export function RepositoryAnalysisCard() {
     const { selectedRepository, analysisState, startAnalysis } = useAnalysis();
     const { refetch: refetchRepositories } = useRepositoriesData();
+    const { incrementActiveCount, decrementActiveCount } = useActiveAnalyses();
 
     if (!selectedRepository) return null;
 
-    const handleStartAnalysis = async () => {
-        try {
-            await startAnalysis();
-            // Refetch repositories to update stats and cards
-            await refetchRepositories();
-        } catch (error) {
-            console.error('Failed to start analysis:', error);
-        }
-    };
+    const handleStartAnalysis = useCallback(async () => {
+        incrementActiveCount();
+        await startAnalysis();
+        decrementActiveCount();
+        // Refetch repositories to update stats and cards
+        await refetchRepositories();
+    }, [startAnalysis, incrementActiveCount, decrementActiveCount, refetchRepositories]);
 
     const getPhaseLabel = () => {
         if (!analysisState) return '';

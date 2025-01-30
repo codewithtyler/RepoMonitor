@@ -8,11 +8,9 @@ import { getAuthState, subscribeToAuth, type AuthState } from '../lib/auth/globa
 import { useEffect, useState } from 'react';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  console.log('[ProtectedRoute] Component mounting');
   const [state, setState] = useState<AuthState>({ loading: true, user: null, session: null });
 
   useEffect(() => {
-    console.log('[ProtectedRoute] Setting up auth subscription');
     let unsubscribe: (() => void) | undefined;
 
     const initAuth = async () => {
@@ -32,27 +30,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  console.log('[ProtectedRoute] State:', { loading: state.loading, hasUser: !!state.user, userId: state.user?.id });
-
   if (state.loading) {
-    console.log('[ProtectedRoute] Showing loading state');
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div>Loading...</div>
+      </div>
+    );
   }
 
   if (!state.user) {
-    console.log('[ProtectedRoute] No user, redirecting to home');
-    return <Navigate to="/" replace />;
+    // Use state to preserve the current URL
+    return <Navigate to="/login" state={{ from: window.location.pathname }} />;
   }
 
-  console.log('[ProtectedRoute] User authenticated, rendering children');
   return <>{children}</>;
 }
 
 export function AppRouter() {
-  console.log('[AppRouter] Rendering router');
   return (
     <Routes>
       <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Home />} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/repository/:owner/:name" element={<ProtectedRoute><Repository /></ProtectedRoute>} />

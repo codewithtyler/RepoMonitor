@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { IssueProcessor } from './issue-processor';
 import { ResultsDisplay } from '../analysis/results-display';
-import { ActiveAnalysisCard } from './active-analysis-card';
 import { theme } from '@/config/theme';
 
 interface DuplicateIssue {
@@ -136,11 +135,6 @@ export function RepositoryAnalysisView({ owner, name }: RepositoryAnalysisViewPr
               />
             )}
           </div>
-        </div>
-        <div>
-          {activeJob && (
-            <ActiveAnalysisCard job={activeJob} />
-          )}
         </div>
       </div>
     </div>

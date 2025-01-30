@@ -59,6 +59,7 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
                 ].slice(0, 10);
                 return newList;
             });
+
         } catch (error) {
             setAnalysisState({
                 phase: 'error',

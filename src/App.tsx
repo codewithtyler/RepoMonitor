@@ -1,22 +1,19 @@
 import { AppRouter } from './routes';
 import { Toaster } from 'sonner';
-import { MotionConfig, AnimatePresence } from 'framer-motion';
-import { SearchProvider } from '@/lib/contexts/search-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const queryClient = new QueryClient();
+import { MotionConfig } from 'framer-motion';
 
 export function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SearchProvider>
-        <MotionConfig reducedMotion="user">
-          <AnimatePresence mode="wait">
-            <AppRouter />
-          </AnimatePresence>
-        </MotionConfig>
-        <Toaster position="bottom-right" />
-      </SearchProvider>
-    </QueryClientProvider>
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-[#0d1117] text-[#c9d1d9]">
+        <AppRouter />
+        <Toaster
+          position="bottom-right"
+          theme="dark"
+          closeButton
+          richColors
+        />
+      </div>
+    </MotionConfig>
   );
 }

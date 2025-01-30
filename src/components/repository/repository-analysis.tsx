@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { theme } from '@/config/theme';
 import type { Repository } from '@/lib/hooks/use-repository-data';
+import { RepositoryActionModal } from '../search/repository-action-modal';
 
 interface Props {
     repository: Repository;
@@ -19,6 +20,7 @@ export function RepositoryAnalysis({ repository, onStartAnalysis }: Props) {
     const [analysisState, setAnalysisState] = useState<AnalysisState>({
         phase: repository.lastAnalysisTimestamp ? 'complete' : 'not_started'
     });
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const handleStartAnalysis = useCallback(async () => {
         try {
@@ -69,16 +71,31 @@ export function RepositoryAnalysis({ repository, onStartAnalysis }: Props) {
 
             <div className="flex flex-col gap-2">
                 {analysisState.phase === 'not_started' && (
-                    <button
-                        onClick={handleStartAnalysis}
-                        className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        style={{
-                            backgroundColor: theme.colors.brand.primary,
-                            color: theme.colors.text.inverse
-                        }}
-                    >
-                        Start Analysis
-                    </button>
+                    <>
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            style={{
+                                backgroundColor: '#238636',
+                                color: '#ffffff'
+                            }}
+                        >
+                            Start Analysis
+                        </button>
+                        <RepositoryActionModal
+                            isOpen={isModalOpen}
+                            onClose={() => setIsModalOpen(false)}
+                            onTrack={async () => {
+                                // Implement track functionality if needed
+                                setIsModalOpen(false);
+                            }}
+                            onAnalyze={async () => {
+                                await handleStartAnalysis();
+                                setIsModalOpen(false);
+                            }}
+                            repository={repository}
+                        />
+                    </>
                 )}
 
                 {isInProgress && (
@@ -137,7 +154,7 @@ export function RepositoryAnalysis({ repository, onStartAnalysis }: Props) {
                             </p>
                         )}
                         <button
-                            onClick={handleStartAnalysis}
+                            onClick={() => setIsModalOpen(true)}
                             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                             style={{
                                 backgroundColor: theme.colors.error.primary,

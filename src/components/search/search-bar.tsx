@@ -8,6 +8,7 @@ import type { SearchResult } from '@/lib/contexts/search-context';
 import { Spinner } from '@/components/common/spinner';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
+import { RepositoryActionModal } from './repository-action-modal';
 
 export function SearchBar() {
   const { user } = useUser();
@@ -30,6 +31,8 @@ export function SearchBar() {
     clearSearch
   } = useSearch();
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<SearchResult | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 

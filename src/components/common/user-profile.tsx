@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
 import { supabase } from '@/lib/auth/supabase-client';
-import { theme } from '@/config/theme';
 import { ChevronDown } from 'lucide-react';
 
 export function UserProfile() {
@@ -54,26 +53,23 @@ export function UserProfile() {
           />
         )}
         <div className="flex items-center gap-1">
-          <span className="text-sm font-medium whitespace-nowrap" style={{ color: theme.colors.text.primary }}>
+          <span className="text-sm font-medium whitespace-nowrap text-[#c9d1d9]">
             Hey {firstName}
           </span>
           <ChevronDown
             size={16}
-            className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
-            style={{ color: theme.colors.text.primary }}
+            className={`transition-transform duration-200 text-[#c9d1d9] ${showDropdown ? 'rotate-180' : ''}`}
           />
         </div>
       </button>
 
       {showDropdown && (
         <div
-          className="absolute right-4 mt-2 w-48 rounded-lg shadow-lg py-1"
-          style={{ backgroundColor: theme.colors.background.secondary }}
+          className="absolute right-4 mt-2 w-48 rounded-lg shadow-lg py-1 bg-[#161b22]"
         >
           <button
             onClick={handleSignOut}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-red-500/10 transition-colors"
-            style={{ color: theme.colors.error.primary }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-red-500/10 transition-colors text-[#f85149]"
           >
             Sign out
           </button>

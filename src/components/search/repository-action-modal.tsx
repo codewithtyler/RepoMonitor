@@ -1,5 +1,6 @@
 import { theme } from '@/config/theme';
-import { X } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 interface RepositoryActionModalProps {
   isOpen: boolean;
@@ -21,6 +22,20 @@ export function RepositoryActionModal({
   onAnalyze,
   repository,
 }: RepositoryActionModalProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (!isOpen) return null;
 
   return (
@@ -54,27 +69,43 @@ export function RepositoryActionModal({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col gap-2">
-          <button
-            onClick={onTrack}
-            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: theme.colors.background.secondary,
-              color: theme.colors.text.primary,
-            }}
-          >
-            Track Repository
-          </button>
+        <div className="flex gap-2 relative" ref={dropdownRef}>
           <button
             onClick={onAnalyze}
-            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className="flex-1 rounded-l-lg px-4 py-2 text-sm font-medium transition-colors"
             style={{
-              backgroundColor: theme.colors.brand.primary,
-              color: theme.colors.text.inverse,
+              backgroundColor: '#238636',
+              color: '#ffffff'
             }}
           >
-            Start Analysis
+            Analyze
           </button>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="rounded-r-lg px-2 py-2 text-sm font-medium transition-colors border-l border-[#2ea043]"
+            style={{
+              backgroundColor: '#238636',
+              color: '#ffffff'
+            }}
+            aria-label="Show more options"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+
+          {isDropdownOpen && (
+            <div className="absolute right-0 top-full mt-2 w-48 rounded-lg shadow-lg z-50 overflow-hidden" style={{ backgroundColor: theme.colors.background.secondary }}>
+              <button
+                onClick={() => {
+                  onTrack();
+                  setIsDropdownOpen(false);
+                }}
+                className="w-full px-4 py-2 text-sm text-left transition-colors hover:bg-gray-500/10"
+                style={{ color: theme.colors.text.primary }}
+              >
+                Track Repository
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

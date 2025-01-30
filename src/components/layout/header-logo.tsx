@@ -1,6 +1,5 @@
 import { Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { theme } from '../../config/theme';
 import { useUser } from '../../lib/auth/hooks';
 
 export function HeaderLogo() {
@@ -10,8 +9,8 @@ export function HeaderLogo() {
   return (
     <div className="mr-4 flex">
       <Link to={homePath} className="flex items-center space-x-2">
-        <Activity className="h-5 w-5" style={{ color: theme.colors.brand.primary }} />
-        <span className="text-sm font-medium" style={{ color: theme.colors.text.primary }}>RepoMonitor</span>
+        <Activity className="h-5 w-5 text-[#238636]" />
+        <span className="text-sm font-medium text-[#c9d1d9]">RepoMonitor</span>
       </Link>
     </div>
   );

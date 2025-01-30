@@ -14,22 +14,32 @@ import { useTrackedRepositories } from '@/lib/hooks/use-tracked-repositories';
 import { useGitHub } from '@/lib/hooks/use-github';
 import { supabase } from '@/lib/auth/supabase-client';
 import { toast } from '@/hooks/use-toast';
-import { GitFork } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { GitHubClient } from '@/lib/github';
+import { ActiveAnalysisGlobalCard } from '@/components/analysis/active-analysis-global-card';
+import { useActiveAnalyses } from '@/lib/contexts/active-analyses-context';
+import { RepositoryActionModal } from '../components/search/repository-action-modal';
+
+interface Stats {
+  title: string;
+  value: string | number;
+  description: string;
+  layoutOrder: number;
+}
 
 export function Dashboard() {
-  const [searchQuery, setSearchQuery] = useState('');
   const { data: repositories, isLoading, error } = useRepositoriesData();
-  const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis();
+  const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis() as {
+    selectedRepository: Repository | null;
+    recentlyAnalyzed: Repository[];
+    selectRepository: (repo: Repository | SearchResult) => void;
+  };
   const { data: trackedData } = useTrackedRepositories();
   const { withGitHub } = useGitHub();
   const queryClient = useQueryClient();
-
-  const filteredRepositories = repositories?.filter(repo => {
-    if (!searchQuery) return true;
-    return `${repo.owner}/${repo.name}`.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const { activeCount } = useActiveAnalyses() as { activeCount: number };
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
     selectRepository(repository);
@@ -84,23 +94,27 @@ export function Dashboard() {
     }
   };
 
+  const handleStartAnalysis = async () => {
+    if (!selectedRepository) return;
+    try {
+      // Implement analysis logic here
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Failed to start analysis:', error);
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.colors.background.primary }}>
-        {/* Fixed Header/Navbar */}
-        <header className="h-14 border-b" style={{ borderColor: theme.colors.border.primary }}>
+      <div className="min-h-screen flex flex-col bg-[#0d1117] text-[#c9d1d9]">
+        <header className="h-14 border-b border-[#30363d]">
           <div className="flex items-center justify-between px-4 h-full">
             <div className="w-48">
               <HeaderLogo />
             </div>
             <div className="flex-1 flex justify-center">
               <div className="w-full max-w-md">
-                <SearchBar
-                  placeholder="Search repositories..."
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  autoFocus
-                />
+                <SearchBar />
               </div>
             </div>
             <div className="w-48 flex items-center justify-end gap-4">
@@ -110,7 +124,7 @@ export function Dashboard() {
           </div>
         </header>
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-2" style={{ borderColor: theme.colors.text.secondary, borderTopColor: 'transparent' }} />
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#8b949e] border-t-transparent" />
         </div>
       </div>
     );
@@ -118,21 +132,15 @@ export function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.colors.background.primary }}>
-        {/* Fixed Header/Navbar */}
-        <header className="h-14 border-b" style={{ borderColor: theme.colors.border.primary }}>
+      <div className="min-h-screen flex flex-col bg-[#0d1117] text-[#c9d1d9]">
+        <header className="h-14 border-b border-[#30363d]">
           <div className="flex items-center justify-between px-4 h-full">
             <div className="w-48">
               <HeaderLogo />
             </div>
             <div className="flex-1 flex justify-center">
               <div className="w-full max-w-md">
-                <SearchBar
-                  placeholder="Search repositories..."
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  autoFocus
-                />
+                <SearchBar />
               </div>
             </div>
             <div className="w-48 flex items-center justify-end gap-4">
@@ -143,8 +151,8 @@ export function Dashboard() {
         </header>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <h2 className="text-lg font-medium mb-2" style={{ color: theme.colors.text.primary }}>Error Loading Repositories</h2>
-            <p style={{ color: theme.colors.error.primary }}>{error.message}</p>
+            <h2 className="text-lg font-medium mb-2">Error Loading Repositories</h2>
+            <p className="text-[#f85149]">{error.message}</p>
           </div>
         </div>
       </div>
@@ -169,31 +177,19 @@ export function Dashboard() {
       value: recentlyAnalyzed.length,
       description: 'Repositories that have been analyzed',
       layoutOrder: 3
-    },
-    {
-      title: 'Active Analysis',
-      value: 0,
-      description: 'Repositories currently being analyzed',
-      layoutOrder: 4
     }
   ];
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.colors.background.primary }}>
-      {/* Fixed Header/Navbar */}
-      <header className="h-14 border-b" style={{ borderColor: theme.colors.border.primary }}>
+    <div className="min-h-screen flex flex-col bg-[#0d1117] text-[#c9d1d9]">
+      <header className="h-14 border-b border-[#30363d]">
         <div className="flex items-center justify-between px-4 h-full">
           <div className="w-48">
             <HeaderLogo />
           </div>
           <div className="flex-1 flex justify-center">
             <div className="w-full max-w-md">
-              <SearchBar
-                placeholder="Search repositories..."
-                value={searchQuery}
-                onChange={setSearchQuery}
-                autoFocus
-              />
+              <SearchBar />
             </div>
           </div>
           <div className="w-48 flex items-center justify-end gap-4">
@@ -203,26 +199,39 @@ export function Dashboard() {
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="flex flex-1">
-        {/* Left Sidebar - Always narrow, only shows favorites and recent */}
-        <div className="w-64 border-r flex-shrink-0" style={{ borderColor: theme.colors.border.primary }}>
+        {/* Left Sidebar */}
+        <div className="w-64 border-r border-[#30363d] flex-shrink-0">
           <div className="p-4 space-y-6">
-            {/* Favorites Section */}
+            {/* Tracked Repositories Section */}
             <div>
-              <h2 className="text-sm font-medium mb-3" style={{ color: theme.colors.text.secondary }}>
-                Favorite Repositories
+              <h2 className="text-sm font-medium mb-3 text-[#8b949e]">
+                Tracked Repositories
               </h2>
               <div className="space-y-1">
-                <div className="px-2 py-1 text-sm" style={{ color: theme.colors.text.secondary }}>
-                  No favorite repositories yet
-                </div>
+                {trackedData?.repositories && trackedData.repositories.length > 0 ? (
+                  trackedData.repositories.map(repo => (
+                    <button
+                      key={repo.id}
+                      onClick={() => handleRepositorySelect(repo)}
+                      className="w-full px-2 py-1 text-left rounded hover:bg-[#21262d] transition-colors text-[#8b949e]"
+                    >
+                      <span className="text-sm truncate block">
+                        {repo.owner}/{repo.name}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-2 py-1 text-sm text-[#8b949e]">
+                    No tracked repositories yet
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Recently Analyzed Section */}
             <div>
-              <h2 className="text-sm font-medium mb-3" style={{ color: theme.colors.text.secondary }}>
+              <h2 className="text-sm font-medium mb-3 text-[#8b949e]">
                 Recently Analyzed
               </h2>
               <div className="space-y-1">
@@ -231,15 +240,15 @@ export function Dashboard() {
                     <button
                       key={repo.id}
                       onClick={() => handleRepositorySelect(repo)}
-                      className="w-full px-2 py-1 text-left rounded hover:bg-gray-500/5 transition-colors"
+                      className="w-full px-2 py-1 text-left rounded hover:bg-[#21262d] transition-colors text-[#8b949e]"
                     >
-                      <span className="text-sm truncate block" style={{ color: theme.colors.text.secondary }}>
+                      <span className="text-sm truncate block">
                         {repo.owner}/{repo.name}
                       </span>
                     </button>
                   ))
                 ) : (
-                  <div className="px-2 py-1 text-sm" style={{ color: theme.colors.text.secondary }}>
+                  <div className="px-2 py-1 text-sm text-[#8b949e]">
                     No repositories analyzed yet
                   </div>
                 )}
@@ -269,10 +278,24 @@ export function Dashboard() {
                       layoutOrder={stat.layoutOrder}
                     />
                   ))}
+                  <ActiveAnalysisGlobalCard />
                 </div>
 
                 <div className="space-y-4">
-                  <RepositoryList repositories={filteredRepositories || []} />
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium">
+                      Recently Analyzed Repositories
+                    </h2>
+                  </div>
+                  {recentlyAnalyzed && recentlyAnalyzed.length > 0 ? (
+                    <RepositoryList repositories={recentlyAnalyzed} />
+                  ) : (
+                    <div className="p-4 rounded-lg text-center">
+                      <p>
+                        No repositories have been analyzed yet
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -282,34 +305,45 @@ export function Dashboard() {
         {/* Right Panel - Only shows when repo is selected */}
         <div
           className={`${selectedRepository ? 'w-80 opacity-100' : 'w-0 opacity-0'} border-l flex-shrink-0 transition-all duration-300 overflow-hidden`}
-          style={{ borderColor: theme.colors.border.primary }}
         >
           <div className="p-4 space-y-4">
             {/* Track Repository Button */}
             <button
-              onClick={handleTrackRepository}
+              onClick={() => setIsModalOpen(true)}
               className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors hover:opacity-80"
-              style={{ backgroundColor: theme.colors.brand.primary, color: theme.colors.text.inverse }}
+              style={{ backgroundColor: '#238636', color: '#ffffff' }}
             >
-              <GitFork className="h-4 w-4" />
-              Track Repository
+              <ExternalLink className="h-4 w-4" />
+              Open With...
             </button>
 
-            <h2 className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+            {selectedRepository && (
+              <RepositoryActionModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onTrack={handleTrackRepository}
+                onAnalyze={handleStartAnalysis}
+                repository={selectedRepository}
+              />
+            )}
+
+            <h2 className="text-sm font-medium">
               Global Stats
             </h2>
-            {stats.map((stat) => (
+            {stats.map((stat: Stats, index: number) => (
               <GlobalStatsCard
-                key={stat.title}
+                key={index}
                 title={stat.title}
                 value={stat.value}
                 description={stat.description}
                 layoutOrder={stat.layoutOrder}
               />
             ))}
+            <ActiveAnalysisGlobalCard />
           </div>
         </div>
       </div>
     </div>
   );
 }
+
