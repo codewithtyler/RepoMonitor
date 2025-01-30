@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Repository } from '@/lib/hooks/use-repository-data';
 import type { SearchResult } from '@/lib/contexts/search-context';
 import { GitFork } from 'lucide-react';
@@ -7,6 +6,7 @@ interface RepositoryActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTrack: () => void;
+  onAnalyze: () => Promise<void>;
   repository: Repository | SearchResult;
 }
 
@@ -14,6 +14,7 @@ export function RepositoryActionModal({
   isOpen,
   onClose,
   onTrack,
+  onAnalyze,
   repository
 }: RepositoryActionModalProps) {
   if (!isOpen) return null;
@@ -21,9 +22,9 @@ export function RepositoryActionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-[#0d1117] rounded-lg p-6 max-w-md w-full">
-        <h2 className="text-lg font-medium mb-4">Track Repository</h2>
+        <h2 className="text-lg font-medium mb-4">Repository Actions</h2>
         <p className="text-sm mb-6">
-          Do you want to track {repository.owner}/{repository.name}?
+          What would you like to do with {repository.owner}/{repository.name}?
         </p>
         <div className="flex justify-end gap-3">
           <button
@@ -31,6 +32,15 @@ export function RepositoryActionModal({
             className="px-4 py-2 rounded-lg text-[#c9d1d9] hover:bg-[#21262d] transition-colors"
           >
             Cancel
+          </button>
+          <button
+            onClick={async () => {
+              await onAnalyze();
+              onClose();
+            }}
+            className="px-4 py-2 rounded-lg flex items-center gap-2 bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
+          >
+            Analyze Repository
           </button>
           <button
             onClick={() => {

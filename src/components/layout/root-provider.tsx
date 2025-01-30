@@ -5,6 +5,7 @@ import { GitHubProvider } from '@/lib/contexts/github-context';
 import { SearchProvider } from '@/lib/contexts/search-context';
 import { AnalysisProvider } from '@/lib/contexts/analysis-context';
 import { ActiveAnalysesProvider } from '@/lib/contexts/active-analyses-context';
+import { AuthProvider } from '@/lib/contexts/auth-context';
 
 interface RootProviderProps {
   children: ReactNode;
@@ -13,15 +14,17 @@ interface RootProviderProps {
 export function RootProvider({ children }: RootProviderProps) {
   return (
     <QueryClientProvider client={queryClient}>
-      <GitHubProvider>
-        <SearchProvider>
-          <AnalysisProvider>
-            <ActiveAnalysesProvider>
-              {children}
-            </ActiveAnalysesProvider>
-          </AnalysisProvider>
-        </SearchProvider>
-      </GitHubProvider>
+      <AuthProvider>
+        <GitHubProvider>
+          <SearchProvider>
+            <AnalysisProvider>
+              <ActiveAnalysesProvider>
+                {children}
+              </ActiveAnalysesProvider>
+            </AnalysisProvider>
+          </SearchProvider>
+        </GitHubProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

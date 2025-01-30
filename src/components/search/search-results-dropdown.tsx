@@ -16,6 +16,7 @@ interface Props {
   onClearRecentSearches: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
+  onTrackRepository: () => void;
 }
 
 export function SearchResultsDropdown({
@@ -32,7 +33,9 @@ export function SearchResultsDropdown({
   onLoadMore
 }: Props) {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     const initUser = async () => {
@@ -41,6 +44,52 @@ export function SearchResultsDropdown({
     };
     initUser();
   }, []);
+
+  // Reset selected index when results change
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [results]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!dropdownRef.current) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev => {
+          const next = prev + 1;
+          const max = results.length - 1;
+          const newIndex = next > max ? 0 : next;
+          itemRefs.current[newIndex]?.scrollIntoView({ block: 'nearest' });
+          return newIndex;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => {
+          const next = prev - 1;
+          const max = results.length - 1;
+          const newIndex = next < 0 ? max : next;
+          itemRefs.current[newIndex]?.scrollIntoView({ block: 'nearest' });
+          return newIndex;
+        });
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedIndex >= 0) {
+          const selectedRepo = results[selectedIndex];
+          if (selectedRepo) {
+            onSelect(selectedRepo);
+          }
+        }
+        break;
+    }
+  }, [selectedIndex, results, onSelect]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const handleScroll = useCallback(() => {
     if (!dropdownRef.current || loading || !hasMore) return;
@@ -71,65 +120,69 @@ export function SearchResultsDropdown({
     );
   }
 
-  const renderRepositoryItem = (repo: SearchResult, isRecent: boolean) => (
-    <div
+  const renderRepositoryItem = (repo: SearchResult, index: number, isRecent: boolean = false) => (
+    <button
+      ref={el => itemRefs.current[index] = el}
       key={repo.id}
       onClick={() => isRecent ? onSelectRecentSearch(repo) : onSelect(repo)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          isRecent ? onSelectRecentSearch(repo) : onSelect(repo);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      className="w-full px-3 py-2 text-left hover:bg-gray-500/5 transition-colors group cursor-pointer"
+      className={`w-full px-4 py-2 transition-colors text-left flex items-center justify-between group
+        ${selectedIndex === index ? 'bg-[#21262d]' : 'hover:bg-[#21262d]'}`}
+      aria-selected={selectedIndex === index}
+      role="option"
     >
-      <div className="flex items-center justify-between">
-        <div className="truncate">
-          <span style={{ color: theme.colors.text.primary }}>{repo.owner}/</span>
-          <span className="font-medium" style={{ color: theme.colors.text.primary }}>{repo.name}</span>
-        </div>
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1" style={{ color: theme.colors.text.secondary }}>
-            <span className="text-xs">{repo.stargazersCount.toLocaleString()}</span>
-            <Star className="h-4 w-4" />
-          </div>
-          {isRecent && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onRemoveRecentSearch(repo.id);
-              }}
-              className="opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Remove from recent searches"
-            >
-              <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
-            </button>
+          <span className="text-sm font-medium text-[#c9d1d9] truncate">
+            {repo.owner}/{repo.name}
+          </span>
+          {repo.visibility === 'private' && (
+            <span className="px-2 py-0.5 text-xs rounded-full bg-[#30363d] text-[#8b949e]">
+              Private
+            </span>
           )}
         </div>
+        {repo.description && (
+          <p className="text-sm text-[#8b949e] truncate mt-0.5">{repo.description}</p>
+        )}
       </div>
-    </div>
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 text-[#8b949e]">
+          <span className="text-xs">{repo.stargazersCount.toLocaleString()}</span>
+          <Star className="h-4 w-4" />
+        </div>
+        {isRecent && (
+          <div
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveRecentSearch(repo.id);
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            aria-label="Remove from recent searches"
+          >
+            <X className="h-4 w-4 text-[#8b949e]" />
+          </div>
+        )}
+      </div>
+    </button>
   );
 
-  const renderBatchSeparator = () => (
-    <div className="px-3 py-2">
-      <div className="w-full h-px" style={{ backgroundColor: theme.colors.border.primary }} />
-    </div>
-  );
-
-  const renderResults = (repos: SearchResult[], isOwned: boolean = false, startIndex: number = 0) => {
-    return repos.reduce((acc: JSX.Element[], repo, index) => {
-      const globalIndex = startIndex + index;
-      // Add separator every 10 items, but not at the start
-      if (globalIndex > 0 && globalIndex % 10 === 0) {
-        acc.push(renderBatchSeparator());
-      }
-      acc.push(renderRepositoryItem(repo, false));
-      return acc;
-    }, []);
+  const renderBatchSeparator = (index: number) => {
+    if (index > 0 && index % 10 === 0) {
+      return (
+        <div className="relative px-3 py-2">
+          <div className="absolute inset-0 flex items-center px-3">
+            <div className="w-full h-px bg-[#30363d]" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="px-2 text-xs font-medium bg-[#0d1117] text-[#8b949e]">
+              More Results
+            </span>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   // Limit total results to 30, prioritizing owned repositories
@@ -159,7 +212,8 @@ export function SearchResultsDropdown({
                       Owned
                     </div>
                   </div>
-                  {renderResults(ownedRepos, true, 0)}
+                  {renderBatchSeparator(0)}
+                  {ownedRepos.map((repo, index) => renderRepositoryItem(repo, index))}
                 </>
               )}
 
@@ -176,7 +230,7 @@ export function SearchResultsDropdown({
                       </span>
                     </div>
                   </div>
-                  {renderResults(limitedOtherRepos, false, ownedCount)}
+                  {limitedOtherRepos.map((repo, index) => renderRepositoryItem(repo, index + ownedCount))}
                 </>
               )}
             </>
@@ -203,7 +257,7 @@ export function SearchResultsDropdown({
                 Clear All
               </button>
             </div>
-            {recentSearches.slice(0, 5).map(repo => renderRepositoryItem(repo, true))}
+            {recentSearches.slice(0, 5).map((repo, index) => renderRepositoryItem(repo, index, true))}
           </>
         ) : (
           // Default message when no history and no search

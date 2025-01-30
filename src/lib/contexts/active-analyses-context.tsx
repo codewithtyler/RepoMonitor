@@ -6,7 +6,13 @@ interface ActiveAnalysesContextType {
     decrementActiveCount: () => void;
 }
 
-const ActiveAnalysesContext = createContext<ActiveAnalysesContextType | null>(null);
+const defaultContext: ActiveAnalysesContextType = {
+    activeCount: 0,
+    incrementActiveCount: () => { },
+    decrementActiveCount: () => { }
+};
+
+const ActiveAnalysesContext = createContext<ActiveAnalysesContextType>(defaultContext);
 
 export function ActiveAnalysesProvider({ children }: { children: React.ReactNode }) {
     const [activeCount, setActiveCount] = useState(0);
@@ -34,8 +40,8 @@ export function ActiveAnalysesProvider({ children }: { children: React.ReactNode
 
 export function useActiveAnalyses(): ActiveAnalysesContextType {
     const context = useContext(ActiveAnalysesContext);
-    if (context === null) {
+    if (!context) {
         throw new Error('useActiveAnalyses must be used within an ActiveAnalysesProvider');
     }
-    return context;
+    return context as ActiveAnalysesContextType;
 }

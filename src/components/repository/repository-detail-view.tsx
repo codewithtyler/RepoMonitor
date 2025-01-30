@@ -1,29 +1,25 @@
+import { useEffect, useState, useRef } from 'react';
+import type { Repository } from '@/lib/hooks/use-repository-data';
+import type { SearchResult } from '@/lib/contexts/search-context';
+import { useAnalysis } from '@/lib/contexts/analysis-context';
+import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { GitBranch, GitMerge, GitPullRequest, AlertCircle, ArrowLeft, ChevronDown } from 'lucide-react';
 import { theme } from '@/config/theme';
-import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
-import { useAnalysis } from '@/lib/contexts/analysis-context';
-import { RepoStatsCard } from '@/components/common/repo-stats-card';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
-import { OpenWithModal } from './open-with-modal';
-import { Button } from '@/components/common/button';
-import { Badge } from '@/components/common/badge';
-import { CustomScrollbar } from '@/components/common/custom-scrollbar';
+import { RepoStatsCard } from '@/components/common/repo-stats-card';
 
 interface RepositoryDetailViewProps {
-  owner: string;
-  name: string;
+  repository: Repository | SearchResult;
+  onBack: () => void;
 }
 
-export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps) {
-  const { data: repository, isLoading } = useRepositoryDetails(owner, name);
+export function RepositoryDetailView({ repository, onBack }: RepositoryDetailViewProps) {
+  const { data: details, isLoading } = useRepositoryDetails(repository.owner, repository.name);
   const { analysisState, startAnalysis, clearSelection } = useAnalysis();
   const navigate = useNavigate();
   const [selectedAction, setSelectedAction] = useState<'analyze' | 'track'>('analyze');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -36,7 +32,18 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (isLoading || !repository) {
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onBack();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onBack]);
+
+  if (isLoading || !details) {
     return (
       <div className="text-center" style={{ color: theme.colors.text.secondary }}>
         Loading repository details...
@@ -53,7 +60,7 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
   };
 
   const handleTrackRepository = async () => {
-    if (!repository) return;
+    if (!details) return;
 
     try {
       // Get existing tracked repositories from localStorage
@@ -61,13 +68,13 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
 
       // Check if repository is already tracked
       const isAlreadyTracked = trackedRepos.some(
-        (repo: any) => repo.owner === repository.owner && repo.name === repository.name
+        (repo: any) => repo.owner === details.owner && repo.name === details.name
       );
 
       if (isAlreadyTracked) {
         // Remove from tracked repositories if already tracked
         const updatedRepos = trackedRepos.filter(
-          (repo: any) => !(repo.owner === repository.owner && repo.name === repository.name)
+          (repo: any) => !(repo.owner === details.owner && repo.name === details.name)
         );
         localStorage.setItem('trackedRepositories', JSON.stringify(updatedRepos));
 
@@ -77,11 +84,11 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
       } else {
         // Add to tracked repositories
         trackedRepos.push({
-          owner: repository.owner,
-          name: repository.name,
-          id: repository.id,
-          description: repository.description,
-          openIssuesCount: repository.openIssuesCount
+          owner: details.owner,
+          name: details.name,
+          id: details.id,
+          description: details.description,
+          openIssuesCount: details.openIssuesCount
         });
         localStorage.setItem('trackedRepositories', JSON.stringify(trackedRepos));
 
@@ -166,7 +173,7 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
     // Get existing tracked repositories from localStorage
     const trackedRepos = JSON.parse(localStorage.getItem('trackedRepositories') || '[]');
     const isTracked = trackedRepos.some(
-      (repo: any) => repo.owner === repository.owner && repo.name === repository.name
+      (repo: any) => repo.owner === details.owner && repo.name === details.name
     );
     return isTracked ? 'Untrack Repository' : 'Track Repository';
   };
@@ -187,17 +194,17 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
       <div>
         <h2 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
           <a
-            href={`https://github.com/${repository.owner}/${repository.name}`}
+            href={`https://github.com/${details.owner}/${details.name}`}
             target="_blank"
             rel="noopener noreferrer"
             className="hover:underline hover:text-[#2ea043] transition-colors"
           >
-            {repository.owner}/{repository.name}
+            {details.owner}/{details.name}
           </a>
         </h2>
-        {repository.description && (
+        {details.description && (
           <p className="mt-2" style={{ color: theme.colors.text.secondary }}>
-            {repository.description}
+            {details.description}
           </p>
         )}
       </div>
@@ -207,7 +214,7 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
         <RepoStatsCard
           id="openIssues"
           title="Open Issues"
-          value={repository.openIssuesCount?.toString() || '0'}
+          value={details.openIssuesCount?.toString() || '0'}
           description="Total open issues"
           icon={GitPullRequest}
         />
