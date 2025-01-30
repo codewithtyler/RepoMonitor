@@ -39,7 +39,14 @@ export interface GitHubRepository {
   archived?: boolean;
   disabled?: boolean;
   subscribers_count?: number;
-  is_private?: boolean;
+  fork?: boolean;
+  source?: {
+    owner: {
+      login: string;
+    };
+    name: string;
+  };
+  private?: boolean;
 }
 
 export interface SearchOptions {

@@ -7,6 +7,7 @@ import { AnalysisProvider } from '@/lib/contexts/analysis-context';
 import { ActiveAnalysesProvider } from '@/lib/contexts/active-analyses-context';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/contexts/auth-context';
+import { GitHubProvider } from '@/lib/contexts/github-context';
 import { App } from './App';
 import './styles/index.css';
 
@@ -36,9 +37,11 @@ root.render(
           <AuthProvider>
             <ActiveAnalysesProvider>
               <AnalysisProvider>
-                <SearchProvider>
-                  <App />
-                </SearchProvider>
+                <GitHubProvider>
+                  <SearchProvider>
+                    <App />
+                  </SearchProvider>
+                </GitHubProvider>
               </AnalysisProvider>
             </ActiveAnalysesProvider>
           </AuthProvider>

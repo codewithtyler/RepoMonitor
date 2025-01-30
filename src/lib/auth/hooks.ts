@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase-client';
 import { GitHubTokenManager } from './github-token-manager';
 import { logger } from '@/lib/utils/logger';
 import { getAuthState, subscribeToAuth, type AuthState } from './global-state';

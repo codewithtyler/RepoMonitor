@@ -1,7 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import { redirect, useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/auth/supabase-client';
-import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
 import { useUser } from '@/lib/auth/hooks';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';

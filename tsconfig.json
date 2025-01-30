@@ -14,7 +14,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx",
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -26,14 +28,13 @@
       ]
     },
     "types": [
-      "node",
       "react",
-      "react-dom"
+      "react-dom",
+      "node",
+      "vite/client"
     ],
-    "typeRoots": [
-      "./node_modules/@types",
-      "./src/types"
-    ]
+    "allowJs": true,
+    "esModuleInterop": true
   },
   "include": [
     "src"

@@ -1,18 +1,29 @@
-import 'react';
-import * as React from 'react';
+/// <reference types="react" />
+/// <reference types="react-dom" />
 
-declare module 'react' {
-    export const useState: <T>(initialState: T | (() => T)) => [T, (newState: T | ((prevState: T) => T)) => void];
-    export const useEffect: (effect: () => void | (() => void), deps?: readonly any[]) => void;
-    export const useCallback: <T extends (...args: any[]) => any>(callback: T, deps: readonly any[]) => T;
-    export const useMemo: <T>(factory: () => T, deps: readonly any[]) => T;
-    export const useRef: <T>(initialValue: T) => { current: T };
-    export const useContext: <T>(context: React.Context<T>) => T;
-    export const createContext: <T>(defaultValue: T) => React.Context<T>;
+declare namespace React {
+    interface FunctionComponent<P = {}> {
+        (props: P, context?: any): ReactElement<any, any> | null;
+        displayName?: string;
+        defaultProps?: Partial<P>;
+    }
+
+    interface FC<P = {}> extends FunctionComponent<P> { }
+
+    interface ReactElement<P = any, T extends string | JSXElementConstructor<any> = string | JSXElementConstructor<any>> {
+        type: T;
+        props: P;
+        key: Key | null;
+    }
 }
 
 declare global {
     namespace JSX {
+        interface Element extends React.ReactElement<any, any> { }
+        interface ElementClass extends React.Component<any> { }
+        interface ElementAttributesProperty { props: {}; }
+        interface ElementChildrenAttribute { children: {}; }
+
         interface IntrinsicElements {
             div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
             header: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;

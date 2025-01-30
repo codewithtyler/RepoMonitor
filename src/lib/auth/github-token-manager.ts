@@ -64,7 +64,6 @@ export class GitHubTokenManager {
 
       if (providerToken && this.validateToken(providerToken)) {
         logger.info('[GitHubTokenManager] Using provider token from session');
-        await this.storeToken(userId, providerToken); // Store for future use
         return providerToken;
       }
 

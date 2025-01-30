@@ -5,32 +5,34 @@ import { theme } from '@/config/theme';
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
 // All components are built from scratch using TailwindCSS for styling.
 
+const variantStyles = {
+  primary: {
+    default: '#238636',
+    hover: '#2ea043',
+    disabled: '#94d3a2',
+  },
+  secondary: {
+    default: '#161b22',
+    hover: '#30363d',
+    disabled: '#8b949e',
+  },
+  outline: {
+    default: 'transparent',
+    hover: '#30363d',
+    disabled: '#8b949e',
+  },
+} as const;
+
+type ButtonVariant = keyof typeof variantStyles;
+
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: ButtonVariant;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', disabled, children, ...props }, ref) => {
     const baseStyles = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
-    const variantStyles = {
-      primary: {
-        default: theme.colors.brand.primary,
-        hover: theme.colors.brand.primary + 'dd',
-        disabled: theme.colors.brand.primary + '99'
-      },
-      secondary: {
-        default: theme.colors.background.secondary,
-        hover: theme.colors.background.secondary + 'dd',
-        disabled: theme.colors.background.secondary + '99'
-      },
-      outline: {
-        default: 'transparent',
-        hover: theme.colors.background.secondary + '33',
-        disabled: 'transparent'
-      }
-    };
-
-    const styles = variantStyles[variant];
+    const styles = variantStyles[variant as ButtonVariant];
     const isOutline = variant === 'outline';
 
     return (

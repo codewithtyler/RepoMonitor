@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRepositoriesData, type Repository } from '@/lib/hooks/use-repository-data';
 import { type SearchResult } from '@/lib/contexts/search-context';
 import { GlobalStatsCard } from '@/components/common/global-stats-card';
@@ -9,9 +9,8 @@ import { NotificationDropdown } from '@/components/common/notification-dropdown'
 import { UserProfile } from '@/components/common/user-profile';
 import { RepositoryDetailView } from '@/components/repository/repository-detail-view';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
-import { theme } from '@/config/theme';
-import { useTrackedRepositories } from '@/lib/hooks/use-tracked-repositories';
-import { useGitHub } from '@/lib/hooks/use-github';
+import { useGitHub } from '@/lib/contexts/github-context';
+import type { GitHubContextType } from '@/lib/contexts/github-context';
 import { supabase } from '@/lib/auth/supabase-client';
 import { toast } from '@/hooks/use-toast';
 import { ExternalLink } from 'lucide-react';
@@ -19,7 +18,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { GitHubClient } from '@/lib/github';
 import { ActiveAnalysisGlobalCard } from '@/components/analysis/active-analysis-global-card';
 import { useActiveAnalyses } from '@/lib/contexts/active-analyses-context';
-import { RepositoryActionModal } from '../components/search/repository-action-modal';
+import { OpenWithModal } from '@/components/repository/open-with-modal';
 
 interface Stats {
   title: string;
@@ -28,77 +27,39 @@ interface Stats {
   layoutOrder: number;
 }
 
-export function Dashboard() {
+export const Dashboard = () => {
   const { data: repositories, isLoading, error } = useRepositoriesData();
   const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis() as {
     selectedRepository: Repository | null;
     recentlyAnalyzed: Repository[];
     selectRepository: (repo: Repository | SearchResult) => void;
   };
-  const { data: trackedData } = useTrackedRepositories();
-  const { withGitHub } = useGitHub();
+  const { withGitHub } = useGitHub() as GitHubContextType;
   const queryClient = useQueryClient();
-  const { activeCount } = useActiveAnalyses() as { activeCount: number };
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  useActiveAnalyses();
+  const [trackedRepositories, setTrackedRepositories] = useState<Repository[]>([]);
+  const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
+
+  // Load tracked repositories from localStorage
+  useEffect(() => {
+    const loadTrackedRepos = () => {
+      const tracked = JSON.parse(localStorage.getItem('trackedRepositories') || '[]');
+      setTrackedRepositories(tracked);
+    };
+
+    loadTrackedRepos();
+    window.addEventListener('storage', loadTrackedRepos);
+    return () => window.removeEventListener('storage', loadTrackedRepos);
+  }, []);
 
   const handleRepositorySelect = (repository: Repository | SearchResult) => {
     selectRepository(repository);
-  };
-
-  const handleTrackRepository = async () => {
-    if (!selectedRepository) return;
-
-    try {
-      // Check if we have access and get permissions
-      const access = await withGitHub((client: GitHubClient) =>
-        client.getRepository(selectedRepository.owner, selectedRepository.name)
-      );
-
-      if (!access) {
-        toast({
-          title: 'Access Error',
-          description: 'You no longer have access to this repository.',
-          variant: 'destructive'
-        });
-        return;
-      }
-
-      // Add repository to tracking
-      const { error } = await supabase
-        .from('repositories')
-        .upsert({
-          github_id: access.id,
-          name: selectedRepository.name,
-          owner: selectedRepository.owner,
-          repository_permissions: access.permissions,
-          last_analysis_timestamp: null,
-          analyzed_by_user_id: null,
-          is_public: access.visibility === 'public'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Repository Added',
-        description: `Now tracking ${selectedRepository.owner}/${selectedRepository.name}`,
-      });
-
-      // Refetch tracked repositories to update the count
-      await queryClient.invalidateQueries({ queryKey: ['tracked-repositories'] });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to track repository. Please try again.',
-        variant: 'destructive'
-      });
-    }
   };
 
   const handleStartAnalysis = async () => {
     if (!selectedRepository) return;
     try {
       // Implement analysis logic here
-      setIsModalOpen(false);
     } catch (error) {
       console.error('Failed to start analysis:', error);
     }
@@ -162,7 +123,7 @@ export function Dashboard() {
   const stats = [
     {
       title: 'Total Repositories',
-      value: trackedData?.count || 0,
+      value: parseInt(localStorage.getItem('totalRepositories') || '0'),
       description: 'Total number of tracked repositories',
       layoutOrder: 1
     },
@@ -209,8 +170,8 @@ export function Dashboard() {
                 Tracked Repositories
               </h2>
               <div className="space-y-1">
-                {trackedData?.repositories && trackedData.repositories.length > 0 ? (
-                  trackedData.repositories.map(repo => (
+                {trackedRepositories.length > 0 ? (
+                  trackedRepositories.map(repo => (
                     <button
                       key={repo.id}
                       onClick={() => handleRepositorySelect(repo)}
@@ -272,10 +233,7 @@ export function Dashboard() {
                   {stats.map((stat, index) => (
                     <GlobalStatsCard
                       key={index}
-                      title={stat.title}
-                      value={stat.value}
-                      description={stat.description}
-                      layoutOrder={stat.layoutOrder}
+                      {...stat}
                     />
                   ))}
                   <ActiveAnalysisGlobalCard />
@@ -288,7 +246,7 @@ export function Dashboard() {
                     </h2>
                   </div>
                   {recentlyAnalyzed && recentlyAnalyzed.length > 0 ? (
-                    <RepositoryList repositories={recentlyAnalyzed} />
+                    <RepositoryList repositories={recentlyAnalyzed as Repository[]} />
                   ) : (
                     <div className="p-4 rounded-lg text-center">
                       <p>
@@ -305,25 +263,28 @@ export function Dashboard() {
         {/* Right Panel - Only shows when repo is selected */}
         <div
           className={`${selectedRepository ? 'w-80 opacity-100' : 'w-0 opacity-0'} border-l flex-shrink-0 transition-all duration-300 overflow-hidden`}
+          style={{ borderColor: '#30363d' }}
         >
           <div className="p-4 space-y-4">
-            {/* Track Repository Button */}
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors hover:opacity-80"
-              style={{ backgroundColor: '#238636', color: '#ffffff' }}
-            >
-              <ExternalLink className="h-4 w-4" />
-              Open With...
-            </button>
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              {selectedRepository && (
+                <button
+                  onClick={() => setIsOpenWithModalVisible(true)}
+                  className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2ea043] transition-colors min-w-[200px]"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open With...
+                </button>
+              )}
+            </div>
 
+            {/* Open With Modal */}
             {selectedRepository && (
-              <RepositoryActionModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onTrack={handleTrackRepository}
-                onAnalyze={handleStartAnalysis}
-                repository={selectedRepository}
+              <OpenWithModal
+                isOpen={isOpenWithModalVisible}
+                onClose={() => setIsOpenWithModalVisible(false)}
+                repositoryUrl={`${selectedRepository.owner}/${selectedRepository.name}`}
               />
             )}
 
@@ -333,10 +294,7 @@ export function Dashboard() {
             {stats.map((stat: Stats, index: number) => (
               <GlobalStatsCard
                 key={index}
-                title={stat.title}
-                value={stat.value}
-                description={stat.description}
-                layoutOrder={stat.layoutOrder}
+                {...stat}
               />
             ))}
             <ActiveAnalysisGlobalCard />

@@ -3,12 +3,14 @@ import { useUser } from '../auth/hooks';
 import { supabase } from '../auth/supabase-client';
 import { logger } from '@/lib/utils/logger';
 
+export type NotificationType = 'SYSTEM_ERROR' | 'DATA_COLLECTION_COMPLETE' | 'PROCESSING_COMPLETE' |
+    'ANALYSIS_COMPLETE' | 'REPORT_COMPLETE' | 'PROCESSING_ERROR' | 'ANALYSIS_ERROR';
+
 export interface Notification {
     id: string;
     title: string;
     message: string;
-    type: 'SYSTEM_ERROR' | 'DATA_COLLECTION_COMPLETE' | 'PROCESSING_COMPLETE' |
-    'ANALYSIS_COMPLETE' | 'REPORT_COMPLETE' | 'PROCESSING_ERROR' | 'ANALYSIS_ERROR';
+    type: NotificationType;
     metadata: Record<string, any>;
     is_read: boolean;
     created_at: string;

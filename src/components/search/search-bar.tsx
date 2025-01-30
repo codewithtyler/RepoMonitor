@@ -10,16 +10,16 @@ import { SearchResultsDropdown } from './search-results-dropdown';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { RepositoryActionModal } from './repository-action-modal';
 
-export function SearchBar() {
-  const { user } = useUser();
-  const { client, withGitHub } = useGitHub();
-  const { selectRepository } = useAnalysis();
+export const SearchBar = () => {
+  const [query, setQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isInteractingWithDropdown, setIsInteractingWithDropdown] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const {
-    query,
-    setQuery,
     results,
-    loading,
     error,
+    loading: isLoading,
     recentSearches,
     removeRecentSearch,
     clearRecentSearches,
@@ -30,117 +30,44 @@ export function SearchBar() {
     search,
     clearSearch
   } = useSearch();
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<SearchResult | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleTrackRepository = async (repo: SearchResult) => {
-    if (!user || !client) return;
-
-    try {
-      // Check if we have access and get permissions
-      const access = await withGitHub(async (client) => {
-        const repoData = await client.getRepository(repo.owner, repo.name);
-        return {
-          hasAccess: true,
-          isPrivate: repoData.visibility === 'private',
-          permissions: repoData.permissions,
-          repoData
-        };
-      });
-
-      if (!access?.hasAccess) {
-        await createNotification({
-          userId: user.id,
-          title: 'Repository Access Error',
-          message: 'You no longer have access to this repository.',
-          type: 'SYSTEM_ERROR',
-          metadata: {
-            repository: `${repo.owner}/${repo.name}`
-          }
-        });
-        return;
-      }
-
-      // Add repository to tracking
-      const { error } = await supabase
-        .from('repositories')
-        .upsert({
-          id: repo.id,
-          github_id: repo.id,
-          name: repo.name,
-          owner: repo.owner,
-          repository_permissions: {
-            admin: access.permissions?.admin || false,
-            push: access.permissions?.push || false,
-            pull: access.permissions?.pull || false,
-            private: access.isPrivate,
-            public: !access.isPrivate
-          },
-          last_analysis_timestamp: null,
-          analyzed_by_user_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('Error tracking repository:', error);
-        throw error;
-      }
-
-      await createNotification({
-        userId: user.id,
-        title: 'Repository Tracked',
-        message: `Now tracking ${repo.owner}/${repo.name}`,
-        type: 'DATA_COLLECTION_COMPLETE',
-        metadata: {
-          repository: `${repo.owner}/${repo.name}`
-        }
-      });
-
-      // Close the dropdown
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error in handleTrackRepository:', error);
-      await createNotification({
-        userId: user.id,
-        title: 'Repository Tracking Error',
-        message: 'Failed to track repository. Please try again.',
-        type: 'SYSTEM_ERROR',
-        metadata: {
-          repository: `${repo.owner}/${repo.name}`,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      });
-    }
-  };
+  const { selectRepository } = useAnalysis();
 
   const handleSelect = (result: SearchResult) => {
     selectResult(result);
     selectRepository(result);
-    setIsOpen(false);
+    setIsDropdownOpen(false);
+    setQuery('');
   };
 
   const handleSelectRecentSearch = (result: SearchResult) => {
     selectRecentSearch(result);
     selectRepository(result);
-    setIsOpen(false);
+    setIsDropdownOpen(false);
+    setQuery('');
   };
 
   const handleBlur = useCallback((event: React.FocusEvent) => {
-    // Check if the related target is within the search container
-    const isWithinContainer = searchContainerRef.current?.contains(event.relatedTarget as Node);
-    if (!isWithinContainer) {
-      setIsOpen(false);
-      setQuery(''); // Clear the input when focus is lost
-      clearSearch(); // Clear the search results
+    // Only close if we're not interacting with the dropdown
+    if (!isInteractingWithDropdown) {
+      const isWithinContainer = searchContainerRef.current?.contains(event.relatedTarget as Node);
+      if (!isWithinContainer) {
+        setIsDropdownOpen(false);
+        setQuery('');
+        clearSearch();
+      }
     }
-  }, [setQuery, clearSearch]);
+  }, [clearSearch, isInteractingWithDropdown]);
 
   const handleFocus = useCallback(() => {
-    setIsOpen(true);
+    setIsDropdownOpen(true);
+  }, []);
+
+  const handleDropdownMouseEnter = useCallback(() => {
+    setIsInteractingWithDropdown(true);
+  }, []);
+
+  const handleDropdownMouseLeave = useCallback(() => {
+    setIsInteractingWithDropdown(false);
   }, []);
 
   // Add effect to trigger search when query changes
@@ -168,34 +95,41 @@ export function SearchBar() {
           onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder="Search repositories..."
-          className="w-full px-4 py-2 text-sm bg-transparent border rounded-md border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          className="w-full px-4 py-2 text-sm bg-[#0d1117] border rounded-md border-[#30363d] focus:outline-none focus:ring-2 focus:ring-[#2ea043] text-[#c9d1d9] placeholder-[#8b949e]"
           aria-label="Search repositories"
+          spellCheck={false}
+          autoComplete="off"
         />
-        {loading && (
+        {isLoading && (
           <div className="absolute right-3 top-2.5">
-            <Spinner size="sm" />
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#8b949e] border-t-transparent" />
           </div>
         )}
       </div>
-      {isOpen && (
-        <SearchResultsDropdown
-          query={query}
-          results={results}
-          loading={loading}
-          error={error}
-          recentSearches={recentSearches}
-          onSelect={handleSelect}
-          onSelectRecentSearch={handleSelectRecentSearch}
-          onRemoveRecentSearch={removeRecentSearch}
-          onClearRecentSearches={clearRecentSearches}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          onTrackRepository={handleTrackRepository}
-        />
+      {isDropdownOpen && (
+        <div
+          onMouseEnter={handleDropdownMouseEnter}
+          onMouseLeave={handleDropdownMouseLeave}
+        >
+          <SearchResultsDropdown
+            query={query}
+            results={results}
+            loading={isLoading}
+            error={error}
+            recentSearches={recentSearches}
+            onSelect={handleSelect}
+            onSelectRecentSearch={handleSelectRecentSearch}
+            onRemoveRecentSearch={removeRecentSearch}
+            onClearRecentSearches={clearRecentSearches}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            onTrackRepository={() => { }}
+          />
+        </div>
       )}
-      {isOpen && query.trim().length > 0 && query.trim().length < 3 && (
-        <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden bg-background-secondary">
-          <div className="px-3 py-2 text-sm text-text-secondary">
+      {isDropdownOpen && query.trim().length > 0 && query.trim().length < 3 && (
+        <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden bg-[#0d1117] border border-[#30363d]">
+          <div className="px-3 py-2 text-sm text-[#8b949e]">
             Please enter at least 3 characters to search
           </div>
         </div>

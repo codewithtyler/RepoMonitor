@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import { getGitHubClient } from '@/lib/github'
 import { getAuthState } from '@/lib/auth/global-state'
+import type { GitHubRepository } from '@/lib/github'
 
 export interface SearchResult {
   id: number;
@@ -41,13 +42,13 @@ export interface SearchContextType {
   clearSearch: () => void;
 }
 
-export const SearchContext = createContext<SearchContextType | null>(null);
+const SearchContext = createContext<SearchContextType | null>(null);
 
 const MAX_RECENT_SEARCHES = 5;
-const INITIAL_PAGE_SIZE = 100;  // Maximum results per page
-const DISPLAY_BATCH_SIZE = 30;  // Show 30 results at a time
-const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
-const MIN_SEARCH_CHARS = 3; // Minimum characters required for search
+const INITIAL_PAGE_SIZE = 30;  // Maximum results from API
+const DISPLAY_BATCH_SIZE = 10;  // Number of results to show per batch
+const CACHE_DURATION = 300000;  // Cache duration (5 minutes)
+const MIN_SEARCH_CHARS = 3;  // Minimum characters required for search
 
 interface CachedResults {
   query: string;
@@ -81,6 +82,28 @@ function isCacheValid(cache: CachedResults | null, query: string): boolean {
   return now - cache.timestamp < CACHE_DURATION;
 }
 
+function convertGitHubRepository(repo: GitHubRepository): SearchResult {
+  return {
+    id: repo.id,
+    owner: repo.owner.login,
+    name: repo.name,
+    description: repo.description,
+    url: repo.html_url,
+    visibility: repo.visibility as 'public' | 'private',
+    stargazersCount: repo.stargazers_count,
+    forksCount: repo.forks_count,
+    openIssuesCount: repo.open_issues_count,
+    subscribersCount: repo.subscribers_count || 0,
+    lastAnalysisTimestamp: null,
+    isAnalyzing: false,
+    isFork: repo.fork || false,
+    source: repo.source ? {
+      owner: repo.source.owner.login,
+      name: repo.source.name
+    } : undefined
+  };
+}
+
 export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -88,8 +111,8 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>(getRecentSearches());
   const [hasMore, setHasMore] = useState(false);
-  const searchCacheRef = useRef<CachedResults | null>(null);
   const [displayedCount, setDisplayedCount] = useState(0);
+  const searchCacheRef = useRef<CachedResults | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,10 +123,9 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     initUser();
   }, []);
 
-  // Load more just updates the display count for the next batch
   const loadMore = useCallback(() => {
     if (!hasMore) return;
-    const nextCount = displayedCount + DISPLAY_BATCH_SIZE;
+    const nextCount = Math.min(displayedCount + DISPLAY_BATCH_SIZE, results.length);
     setDisplayedCount(nextCount);
     setHasMore(nextCount < results.length);
   }, [displayedCount, results.length, hasMore]);
@@ -133,6 +155,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         setResults(cache.results);
         setDisplayedCount(DISPLAY_BATCH_SIZE);
         setHasMore(cache.results.length > DISPLAY_BATCH_SIZE);
+        setLoading(false);
         return;
       }
 
@@ -142,38 +165,10 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
       }
 
       const client = await getGitHubClient(state.user.id);
+      const searchResults = await client.searchRepositories(searchQuery);
 
-      // Get search results first
-      const searchResults = await client.searchRepositories(searchQuery, {
-        query: searchQuery,
-        page: 1,
-        per_page: INITIAL_PAGE_SIZE,
-        sort: 'updated',
-        order: 'desc'
-      });
-
-      // Format the results
-      const formattedResults = searchResults.items.map(repo => ({
-        id: repo.id,
-        owner: repo.owner.login,
-        name: repo.name,
-        description: repo.description,
-        url: repo.html_url,
-        visibility: repo.visibility as 'public' | 'private',
-        stargazersCount: repo.stargazers_count,
-        forksCount: repo.forks_count,
-        openIssuesCount: repo.open_issues_count,
-        subscribersCount: repo.subscribers_count || 0,
-        lastAnalysisTimestamp: null,
-        isAnalyzing: false,
-        isFork: repo.fork || false,
-        source: repo.source ? {
-          owner: repo.source.owner.login,
-          name: repo.source.name
-        } : undefined
-      }));
-
-      // Remove duplicates and sort results
+      // Format and sort results
+      const formattedResults = searchResults.items.map(convertGitHubRepository);
       const uniqueResults = Array.from(new Map(formattedResults.map(item => [item.id, item])).values());
       const sortedResults = uniqueResults.sort((a, b) => {
         // First, prioritize user's repositories
@@ -182,16 +177,12 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
         if (isUserRepoA && !isUserRepoB) return -1;
         if (!isUserRepoA && isUserRepoB) return 1;
 
-        // Then prioritize forks
-        if (a.isFork && !b.isFork) return -1;
-        if (!a.isFork && b.isFork) return 1;
-
-        // Finally sort by stars
+        // Then sort by stars
         return b.stargazersCount - a.stargazersCount;
       });
 
       setResults(sortedResults);
-      setDisplayedCount(DISPLAY_BATCH_SIZE);
+      setDisplayedCount(Math.min(DISPLAY_BATCH_SIZE, sortedResults.length));
       setHasMore(sortedResults.length > DISPLAY_BATCH_SIZE);
 
       // Update cache
@@ -238,7 +229,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
   const removeRecentSearch = useCallback((id: number) => {
     setRecentSearches(prev => {
-      const updated = prev.filter(search => search.id !== id);
+      const updated = prev.filter(s => s.id !== id);
       saveRecentSearches(updated);
       return updated;
     });
@@ -252,8 +243,8 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const value = {
     query,
     setQuery,
-    results: results.slice(0, displayedCount), // Only return currently displayed results
-    allResults: results, // Full set of results for internal use
+    results: results.slice(0, displayedCount),
+    allResults: results,
     loading,
     error,
     recentSearches,
