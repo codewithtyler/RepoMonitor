@@ -246,10 +246,8 @@ export function Dashboard() {
                     </button>
                   ))
                 ) : (
-                  <div className="p-4 rounded-lg text-center bg-[#21262d] border border-[#30363d]">
-                    <p className="text-[#8b949e]">
-                      No repositories have been analyzed yet
-                    </p>
+                  <div className="px-2 py-1 text-sm text-[#8b949e]">
+                    No repositories have been analyzed yet
                   </div>
                 )}
               </div>
@@ -274,7 +272,7 @@ export function Dashboard() {
                   {stats.map((stat) => (
                     <div
                       key={stat.title}
-                      className="p-4 rounded-lg bg-[#21262d] border border-[#30363d]"
+                      className="p-4 rounded-lg bg-[#161b22] border border-[#30363d]"
                     >
                       <h3 className="text-sm font-medium text-[#8b949e]">{stat.title}</h3>
                       <p className="text-2xl font-bold mt-1 text-[#c9d1d9]">{stat.value}</p>
@@ -297,10 +295,8 @@ export function Dashboard() {
                       />
                     </div>
                   ) : (
-                    <div className="p-4 rounded-lg text-center bg-[#21262d] border border-[#30363d]">
-                      <p className="text-[#8b949e]">
-                        No repositories have been analyzed yet
-                      </p>
+                    <div className="px-2 py-1 text-sm text-[#8b949e]">
+                      No repositories have been analyzed yet
                     </div>
                   )}
                 </div>

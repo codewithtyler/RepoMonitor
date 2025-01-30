@@ -112,7 +112,7 @@ export function SearchResultsDropdown({
 
   if (error) {
     return (
-      <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden" style={{ backgroundColor: theme.colors.background.secondary }}>
+      <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg overflow-hidden" style={{ backgroundColor: theme.colors.background.secondary }}>
         <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.error }}>
           {error.message}
         </div>
@@ -196,7 +196,7 @@ export function SearchResultsDropdown({
   return (
     <div
       ref={dropdownRef}
-      className="absolute z-10 w-full mt-1 rounded-md shadow-lg max-h-[24rem] overflow-y-auto bg-[#0d1117] border border-[#30363d]"
+      className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-[24rem] overflow-y-auto bg-[#0d1117] border border-[#30363d]"
       onScroll={handleScroll}
     >
       <div className="py-2">
