@@ -7,15 +7,31 @@ const rateLimiter = new RateLimiter({
   interval: 'minute'
 });
 
+const configuration = {
+  apiKey: process.env.OPENAI_API_KEY
+};
+
+const openaiApi = new OpenAI(configuration);
+
+export async function getEmbeddings(texts: string[]): Promise<number[][]> {
+  try {
+    const response = await openaiApi.embeddings.create({
+      model: 'text-embedding-ada-002',
+      input: texts
+    });
+
+    return response.data.map(item => item.embedding);
+  } catch (error) {
+    console.error('Error getting embeddings:', error);
+    throw error;
+  }
+}
+
 export class OpenAIClient {
   private client: OpenAI;
 
   constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is not set');
-    }
-    this.client = new OpenAI({ apiKey });
+    this.client = openaiApi;
   }
 
   private async waitForRateLimit(tokens: number): Promise<void> {
@@ -51,14 +67,13 @@ export class OpenAIClient {
 
     const response = await this.withRetry(
       () => this.client.embeddings.create({
-        model: "text-embedding-3-small",
-        input: texts,
-        dimensions: 1536
+        model: "text-embedding-ada-002",
+        input: texts
       }),
       estimatedTokens
     );
 
-    return response.data.map(embedding => embedding.embedding);
+    return response.data.map(item => item.embedding);
   }
 
   // Helper to preprocess text before embedding
@@ -72,4 +87,4 @@ export class OpenAIClient {
 }
 
 // Export singleton instance
-export const openai = new OpenAIClient();
+export const openaiClient = new OpenAIClient();

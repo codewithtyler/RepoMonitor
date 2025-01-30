@@ -1,8 +1,7 @@
-import * as React from 'react';
-import { Navigate } from 'react-router-dom';
-import { LoadingSpinner } from '../common/loading-spinner';
-import { useEffect, useState } from 'react';
-import { subscribeToAuth, getAuthState } from '../../lib/auth/global-state';
+import { ReactNode } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useUser } from '@/lib/auth/hooks';
+import { Loader2 } from 'lucide-react';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -14,23 +13,25 @@ import { subscribeToAuth, getAuthState } from '../../lib/auth/global-state';
 // to prevent multiple Supabase requests across components.
 // This ensures all components share the same auth state.
 
-export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState(getAuthState());
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
 
-  useEffect(() => {
-    return subscribeToAuth(setState);
-  }, []);
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { user, loading } = useUser();
+  const location = useLocation();
 
-  if (state.loading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner size={32} />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!state.user) {
-    return <Navigate to="/" replace />;
+  if (!user) {
+    // Pass the current location as state to redirect back after login
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <>{children}</>;

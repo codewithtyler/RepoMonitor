@@ -1,16 +1,15 @@
 export interface Repository {
     id: string;
+    github_id: number;
     owner: string;
     name: string;
     description: string | null;
-    url: string;
     stargazersCount: number;
     forksCount: number;
     openIssuesCount: number;
-    lastAnalysisTimestamp: string | null;
-    isAnalyzing: boolean;
     createdAt: string;
     updatedAt: string;
+    url: string;
     visibility: 'public' | 'private';
     defaultBranch: string;
     permissions: {
@@ -27,6 +26,8 @@ export interface Repository {
     license: {
         key: string;
         name: string;
-        url: string | null;
+        url: string;
     } | null;
+    lastAnalysisTimestamp: string | null;
+    isAnalyzing: boolean;
 }

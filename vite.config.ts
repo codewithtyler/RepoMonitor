@@ -6,7 +6,11 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react',
+      include: '**/*.{jsx,tsx}',
+    }),
     nodePolyfills({
       globals: {
         global: true,
@@ -26,11 +30,26 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
+    'process.env': {}
   },
   optimizeDeps: {
+    include: ['stream', 'util'],
     esbuildOptions: {
       define: {
         global: 'globalThis'
+      }
+    }
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query']
+        }
       }
     }
   }

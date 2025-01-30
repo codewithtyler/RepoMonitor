@@ -1,11 +1,11 @@
-import { AppRouter } from './routes';
+import { AppRoutes } from '@/components/layout/app-routes';
 import { Toaster } from 'sonner';
 
 export function App() {
   return (
     <>
-      <AppRouter />
-      <Toaster position="top-right" />
+      <AppRoutes />
+      <Toaster />
     </>
   );
 }

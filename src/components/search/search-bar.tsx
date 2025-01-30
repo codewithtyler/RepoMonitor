@@ -1,100 +1,138 @@
-import { Search } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
-import { theme } from '@/config/theme';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearch } from '@/lib/contexts/search-context';
+import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { SearchResultsDropdown } from './search-results-dropdown';
-import { useGitHub } from '@/lib/hooks/use-github';
-import { toast } from 'sonner';
+import type { SearchResult } from '@/lib/contexts/search-context';
+import { cn } from '@/lib/utils';
 
-// Note: This project uses plain React + TailwindCSS.
-// We intentionally avoid Next.js, Shadcn UI, and Radix UI.
-// All components are built from scratch using TailwindCSS for styling.
-// New reusable components should be added to src/components/common/
-// Do not create a components/ui folder - use common instead.
+interface SearchBarProps {
+  className?: string;
+}
 
-export function SearchBar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [results, setResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { withGitHub } = useGitHub();
-  const { searchQuery, setSearchQuery, triggerSearch } = useSearch();
-  const searchRef = useRef<HTMLDivElement>(null);
+export const SearchBar = ({ className }: SearchBarProps) => {
+  const [query, setQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isInteractingWithDropdown, setIsInteractingWithDropdown] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const {
+    results,
+    error,
+    loading: isLoading,
+    recentSearches,
+    removeRecentSearch,
+    clearRecentSearches,
+    hasMore,
+    loadMore,
+    selectResult,
+    selectRecentSearch,
+    search,
+    clearSearch
+  } = useSearch();
+  const { selectRepository } = useAnalysis();
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+  const handleSelect = (result: SearchResult) => {
+    selectResult(result);
+    selectRepository(result);
+    setIsDropdownOpen(false);
+    setQuery('');
+  };
+
+  const handleSelectRecentSearch = (result: SearchResult) => {
+    selectRecentSearch(result);
+    selectRepository(result);
+    setIsDropdownOpen(false);
+    setQuery('');
+  };
+
+  const handleBlur = useCallback((event: React.FocusEvent) => {
+    // Only close if we're not interacting with the dropdown
+    if (!isInteractingWithDropdown) {
+      const isWithinContainer = searchContainerRef.current?.contains(event.relatedTarget as Node);
+      if (!isWithinContainer) {
+        setIsDropdownOpen(false);
+        setQuery('');
+        clearSearch();
       }
     }
+  }, [clearSearch, isInteractingWithDropdown]);
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  const handleFocus = useCallback(() => {
+    setIsDropdownOpen(true);
   }, []);
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    setIsLoading(true);
-    setIsOpen(true);
+  const handleDropdownMouseEnter = useCallback(() => {
+    setIsInteractingWithDropdown(true);
+  }, []);
 
-    try {
-      const searchResults = await withGitHub(async (client) => {
-        return client.listUserRepositories({
-          searchQuery: query,
-          per_page: 10
-        });
-      });
+  const handleDropdownMouseLeave = useCallback(() => {
+    setIsInteractingWithDropdown(false);
+  }, []);
 
-      setResults(searchResults || []);
-    } catch (error) {
-      console.error('Search error:', error);
-      if (error instanceof Error &&
-        error.message.includes('rate limit') ||
-        (error as any).status === 403) {
-        toast.error('Rate Limit Exceeded', {
-          description: 'You have exceeded GitHub API rate limits. Please try again in an hour.'
-        });
-      } else {
-        toast.error('Search Failed', {
-          description: 'Failed to search repositories. Please try again.'
-        });
+  // Add effect to trigger search when query changes
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (query.trim()) {
+        search(query);
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    }, 300);
 
-  const handleSelect = (repo: any) => {
-    setIsOpen(false);
-    setSearchQuery('');
-    window.location.href = `/repository/${repo.owner.login}/${repo.name}`;
-  };
+    return () => clearTimeout(delayDebounceFn);
+  }, [query, search]);
 
   return (
-    <div className="relative flex-1 max-w-md mx-auto" ref={searchRef}>
+    <div
+      ref={searchContainerRef}
+      className={cn("relative w-full", className)}
+    >
       <div className="relative">
-        <Search
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4"
-          style={{ color: theme.colors.text.secondary }}
-        />
         <input
+          ref={inputRef}
           type="text"
-          value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder="Search repositories..."
-          className="w-full h-8 pl-9 pr-3 rounded-md border text-sm"
-          style={{
-            backgroundColor: theme.colors.background.secondary,
-            borderColor: theme.colors.border.primary,
-            color: theme.colors.text.primary
-          }}
+          className="w-full px-4 py-2 text-sm bg-[#0d1117] border rounded-lg border-[#30363d] focus:outline-none focus:ring-2 focus:ring-[#2ea043] text-[#c9d1d9] placeholder-[#8b949e]"
+          aria-label="Search repositories"
+          spellCheck={false}
+          autoComplete="off"
         />
+        {isLoading && (
+          <div className="absolute right-3 top-2.5">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#8b949e] border-t-transparent" />
+          </div>
+        )}
       </div>
-      <SearchResultsDropdown
-        results={results}
-        isLoading={isLoading}
-        onSelect={handleSelect}
-        show={isOpen}
-      />
+      {isDropdownOpen && (
+        <div
+          onMouseEnter={handleDropdownMouseEnter}
+          onMouseLeave={handleDropdownMouseLeave}
+        >
+          <SearchResultsDropdown
+            query={query}
+            results={results}
+            loading={isLoading}
+            error={error}
+            recentSearches={recentSearches}
+            onSelect={handleSelect}
+            onSelectRecentSearch={handleSelectRecentSearch}
+            onRemoveRecentSearch={removeRecentSearch}
+            onClearRecentSearches={clearRecentSearches}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            onTrackRepository={() => { }}
+          />
+        </div>
+      )}
+      {isDropdownOpen && query.trim().length > 0 && query.trim().length < 3 && (
+        <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden bg-[#0d1117] border border-[#30363d]">
+          <div className="px-3 py-2 text-sm text-[#8b949e]">
+            Please enter at least 3 characters to search
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,46 +1,98 @@
-import { RateLimiter } from 'limiter';
 import { GitHubTokenManager } from './auth/github-token-manager';
+import { RateLimiter } from 'limiter';
+import { logger } from '@/lib/utils/logger';
+import { supabase } from '@/lib/auth/supabase-client';
 
 // Per-user rate limiter (5000 requests per hour per token)
 const userLimiters = new Map<string, RateLimiter>();
 
-const API_BASE = 'https://api.github.com';
-
-interface GitHubError extends Error {
-  status?: number;
-  response?: {
-    headers?: {
-      'x-ratelimit-reset'?: string;
-    };
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  owner: {
+    login: string;
   };
+  description: string | null;
+  html_url: string;
+  visibility: string;
+  language: string | null;
+  stargazers_count: number;
+  watchers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  default_branch: string;
+  created_at: string;
+  updated_at: string;
+  license: {
+    key: string;
+    name: string;
+    url: string;
+  } | null;
+  permissions?: {
+    admin: boolean;
+    push: boolean;
+    pull: boolean;
+  };
+  topics?: string[];
+  size?: number;
+  has_issues?: boolean;
+  archived?: boolean;
+  disabled?: boolean;
+  subscribers_count?: number;
+  fork?: boolean;
+  source?: {
+    owner: {
+      login: string;
+    };
+    name: string;
+  };
+  private?: boolean;
 }
 
-// Add interface for search results
-interface GitHubSearchResult {
+export interface SearchOptions {
+  query: string;
+  page?: number;
+  per_page?: number;
+  sort?: 'stars' | 'forks' | 'help-wanted-issues' | 'updated';
+  order?: 'asc' | 'desc';
+}
+
+export interface SearchResponse {
   total_count: number;
-  items: Array<{
-    id: number;
-    full_name: string;
-    [key: string]: any;
-  }>;
+  incomplete_results: boolean;
+  items: GitHubRepository[];
 }
 
 export interface GitHubClient {
-  getRepository(owner: string, repo: string): Promise<any>;
-  listRepositoryIssues(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; labels?: string; per_page?: number; page?: number }): Promise<any>;
-  listRepositoryPullRequests(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number }): Promise<any>;
-  searchRepositoryIssues(owner: string, repo: string, options?: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number }): Promise<any>;
-  checkRepositoryAccess(owner: string, repo: string): Promise<{ hasAccess: boolean; isPrivate: boolean | null; permissions: any | null }>;
-  getCurrentUser(): Promise<any>;
-  listUserRepositories(options?: { type?: 'all' | 'owner' | 'public' | 'private' | 'member'; sort?: 'created' | 'updated' | 'pushed' | 'full_name'; per_page?: number; page?: number; searchQuery?: string }): Promise<any>;
+  getRepository(owner: string, repo: string): Promise<GitHubRepository>;
+  searchRepositories(query: string, options?: SearchOptions): Promise<SearchResponse>;
+  listRepositories(): Promise<GitHubRepository[]>;
+  listRepositoryIssues(owner: string, repo: string, options?: {
+    state?: 'open' | 'closed' | 'all';
+    per_page?: number;
+    page?: number;
+  }): Promise<any[]>;
 }
 
-class GitHubClientImpl implements GitHubClient {
+export class GitHubClientImpl implements GitHubClient {
   private token: string;
   private limiter: RateLimiter;
+  private userId: string;
 
   private constructor(token: string, userId: string) {
+    if (!token) {
+      logger.error('[GitHubClient] Attempted to create client with null/empty token');
+      throw new Error('Invalid token provided to GitHubClient');
+    }
+    if (!userId) {
+      logger.error('[GitHubClient] Attempted to create client with null/empty userId');
+      throw new Error('Invalid userId provided to GitHubClient');
+    }
+
     this.token = token;
+    this.userId = userId;
+    logger.debug('[GitHubClient] Creating new client instance', { userId });
 
     // Initialize rate limiter for this user if not exists
     if (!userLimiters.has(userId)) {
@@ -53,304 +105,210 @@ class GitHubClientImpl implements GitHubClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const url = `${API_BASE}${path}`;
+    try {
+      logger.debug('[GitHubClient] Starting API request', {
+        path,
+        userId: this.userId,
+        hasToken: !!this.token,
+        tokenLength: this.token?.length
+      });
 
-    const headers = {
-      'Accept': 'application/vnd.github+json',
-      'Authorization': `token ${this.token}`,
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'RepoMonitor',
-      ...options.headers
-    };
+      // Wait for rate limit
+      await this.limiter.removeTokens(1);
 
-    // Bind fetch to window explicitly
-    const boundFetch = window.fetch.bind(window);
-    const response = await boundFetch(url, {
-      ...options,
-      headers
-    });
+      // Verify we still have a valid token before making request
+      if (!this.token) {
+        logger.error('[GitHubClient] Token is null/empty before request');
+        throw new Error('No valid token available');
+      }
 
-    if (!response.ok) {
-      const error = new Error(response.statusText) as GitHubError;
-      error.status = response.status;
-      error.response = {
-        headers: Object.fromEntries(response.headers.entries())
+      // Ensure token is properly formatted
+      const cleanToken = this.token.trim();
+      if (!cleanToken || cleanToken.length < 40) {
+        logger.error('[GitHubClient] Token is invalid', {
+          tokenLength: cleanToken.length,
+          tokenStart: cleanToken.substring(0, 10) + '...'
+        });
+        await GitHubTokenManager.clearToken(this.userId);
+        throw new Error('Invalid token format');
+      }
+
+      // Log token format (safely)
+      logger.debug('[GitHubClient] Token format check', {
+        length: cleanToken.length,
+        startsWithGho: cleanToken.startsWith('gho_'),
+        startsWithGhp: cleanToken.startsWith('ghp_'),
+        isBase64: /^[A-Za-z0-9+/=]+$/.test(cleanToken)
+      });
+
+      const headers = {
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': `Bearer ${cleanToken}`,
+        ...options.headers
       };
+
+      const requestOptions: RequestInit = {
+        ...options,
+        headers,
+        method: options.method || 'GET'
+      };
+
+      logger.debug('[GitHubClient] Making fetch request', {
+        url: `https://api.github.com${path}`,
+        method: requestOptions.method,
+        hasHeaders: !!requestOptions.headers
+      });
+
+      const response = await fetch(`https://api.github.com${path}`, requestOptions);
+
+      logger.debug('[GitHubClient] Received API response', {
+        path,
+        status: response.status,
+        statusText: response.statusText,
+        remainingRateLimit: response.headers.get('x-ratelimit-remaining')
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          logger.warn('[GitHubClient] Received 401 unauthorized response, clearing token', {
+            userId: this.userId
+          });
+
+          // Check if user's session is still valid
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            logger.error('[GitHubClient] No valid session found');
+            throw new Error('User session expired');
+          }
+
+          // Clear the token and force a refresh
+          await GitHubTokenManager.clearToken(this.userId);
+          this.token = ''; // Clear local token
+          throw new Error('GitHub token is invalid or expired - please refresh the page to re-authenticate');
+        }
+        if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+          logger.warn('[GitHubClient] Rate limit exceeded', {
+            userId: this.userId,
+            resetTime: response.headers.get('x-ratelimit-reset')
+          });
+          throw new Error('GitHub API rate limit exceeded - please try again later');
+        }
+
+        // Try to get response body for better error message
+        let errorBody = '';
+        try {
+          const errorJson = await response.json();
+          errorBody = JSON.stringify(errorJson);
+        } catch {
+          errorBody = await response.text();
+        }
+
+        logger.error('[GitHubClient] GitHub API error', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody
+        });
+
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      logger.error('[GitHubClient] Request failed', {
+        path,
+        userId: this.userId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       throw error;
     }
-
-    return response.json();
   }
 
   static async create(userId: string): Promise<GitHubClient> {
-    // Get token using the token manager
-    const token = await GitHubTokenManager.getToken(userId);
-    return new GitHubClientImpl(token, userId);
-  }
-
-  private async waitForRateLimit(): Promise<void> {
-    const remainingTokens = await this.limiter.removeTokens(1);
-    if (remainingTokens < 0) {
-      const waitTime = -remainingTokens * (3600000 / 5000); // Convert to milliseconds
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-    }
-  }
-
-  private async handleError(error: GitHubError, _retryCount: number): Promise<void> {
-    // Handle rate limit exceeded
-    if (error.status === 403 && error.response?.headers?.['x-ratelimit-reset']) {
-      const resetTime = parseInt(error.response.headers['x-ratelimit-reset']) * 1000;
-      const now = Date.now();
-      const waitTime = Math.max(0, resetTime - now);
-      await new Promise(resolve => setTimeout(resolve, waitTime));
-      throw new Error('RETRY');
-    }
-
-    // Handle server errors (5xx)
-    if (error.status && error.status >= 500 && error.status < 600) {
-      throw new Error('RETRY');
-    }
-
-    throw error;
-  }
-
-  private async withRetry<T>(operation: () => Promise<T>): Promise<T> {
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
-      try {
-        await this.waitForRateLimit();
-        const result = await operation();
-        return result;
-      } catch (error) {
-        const githubError = error as GitHubError;
-
-        if (retryCount >= maxRetries - 1) {
-          throw error;
-        }
-
-        try {
-          await this.handleError(githubError, retryCount);
-          throw error;
-        } catch (handledError) {
-          if ((handledError as Error).message === 'RETRY') {
-            const delay = Math.pow(2, retryCount) * 1000;
-            await new Promise(resolve => setTimeout(resolve, delay));
-            retryCount++;
-            continue;
-          }
-          throw handledError;
-        }
-      }
-    }
-    throw new Error('Max retries exceeded');
-  }
-
-  // Repository operations
-  async getRepository(owner: string, repo: string) {
     try {
-      // First try the exact repository specified
-      return await this.withRetry(() =>
-        this.request(`/repos/${owner}/${repo}`)
-      );
-    } catch (error) {
-      if ((error as GitHubError).status === 404) {
-        // If not found, search for repositories with this name
-        const searchParams = new URLSearchParams({
-          q: `${repo} in:name`,
-          sort: 'stars',
-          order: 'desc',
-          per_page: '10'
-        });
+      logger.debug('[GitHubClient] Creating new client', { userId });
 
-        const searchResult = await this.withRetry(() =>
-          this.request<GitHubSearchResult>(`/search/repositories?${searchParams}`)
-        );
-
-        if (searchResult.total_count === 0) {
-          throw new Error(`No repositories found matching '${repo}'`);
-        }
-
-        return {
-          ...searchResult.items[0],
-          _searchResults: searchResult.items,
-          _isSearchResult: true
-        };
+      // Check if user has a valid session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        logger.error('[GitHubClient] No valid session found during client creation');
+        throw new Error('User must be authenticated');
       }
+
+      const token = await GitHubTokenManager.getToken(userId);
+      if (!token) {
+        logger.error('[GitHubClient] No token found during client creation');
+        throw new Error('No GitHub token found - please re-authenticate');
+      }
+
+      logger.debug('[GitHubClient] Successfully created client', { userId });
+      return new GitHubClientImpl(token, userId);
+    } catch (error) {
+      logger.error('[GitHubClient] Failed to create client:', error);
       throw error;
     }
   }
 
-  async listRepositoryIssues(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; labels?: string; per_page?: number; page?: number } = {}) {
-    const params = new URLSearchParams({
-      state: options.state || 'open',
-      per_page: (options.per_page || 100).toString(),
-      page: (options.page || 1).toString()
-    });
-    if (options.labels) params.set('labels', options.labels);
-
-    const response = await this.withRetry(() =>
-      this.request(`/repos/${owner}/${repo}/issues?${params}`)
-    );
-    return response;
+  async getRepository(owner: string, repo: string): Promise<GitHubRepository> {
+    logger.debug('Fetching repository:', { owner, repo });
+    return this.request<GitHubRepository>(`/repos/${owner}/${repo}`);
   }
 
-  async listRepositoryPullRequests(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number } = {}) {
-    const params = new URLSearchParams({
-      state: options.state || 'open',
-      per_page: (options.per_page || 100).toString(),
-      page: (options.page || 1).toString()
-    });
+  async searchRepositories(query: string, options: Partial<Omit<SearchOptions, 'query'>> = {}): Promise<SearchResponse> {
+    const searchOptions = {
+      query,
+      page: options.page || 1,
+      per_page: options.per_page || 100,  // Default to 100 results
+      sort: options.sort || 'updated',
+      order: options.order || 'desc'
+    };
 
-    const response = await this.withRetry(() =>
-      this.request(`/repos/${owner}/${repo}/pulls?${params}`)
-    );
-    return response;
-  }
+    logger.debug('Searching repositories:', { query: searchOptions.query, options: searchOptions });
 
-  async searchRepositoryIssues(owner: string, repo: string, options: { state?: 'open' | 'closed' | 'all'; per_page?: number; page?: number } = {}) {
-    const query = `repo:${owner}/${repo} is:issue -is:pr is:${options.state || 'open'}`;
+    // Build the search query according to GitHub search syntax
+    // See: https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories
+    const searchTerms = [
+      searchOptions.query,           // User's search term
+      'fork:true',                  // Include forks
+      'archived:false',             // Exclude archived repos
+      'is:public in:name in:description'  // Search in names and descriptions, public repos only
+    ];
+
     const params = new URLSearchParams({
-      q: query,
-      per_page: (options.per_page || 100).toString(),
-      page: (options.page || 1).toString()
+      q: searchTerms.join(' '),
+      page: searchOptions.page.toString(),
+      per_page: searchOptions.per_page.toString(),
+      sort: searchOptions.sort,
+      order: searchOptions.order
     });
 
-    const response = await this.withRetry(() =>
-      this.request(`/search/issues?${params}`)
-    );
-    return response;
+    return this.request<SearchResponse>(`/search/repositories?${params}`);
   }
 
-  async checkRepositoryAccess(owner: string, repo: string) {
-    try {
-      const response = await this.withRetry(() =>
-        this.request<{ private: boolean; permissions: any }>(`/repos/${owner}/${repo}`)
-      );
+  async listRepositories(): Promise<GitHubRepository[]> {
+    const params = new URLSearchParams({
+      type: 'all',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: '100',  // Maximum allowed per page
+      page: '1'
+    });
 
-      return {
-        hasAccess: true,
-        isPrivate: response.private,
-        permissions: response.permissions
-      };
-    } catch (error) {
-      if ((error as GitHubError).status === 404) {
-        return {
-          hasAccess: false,
-          isPrivate: null,
-          permissions: null
-        };
-      }
-      throw error;
-    }
+    return this.request<GitHubRepository[]>(`/user/repos?${params}`);
   }
 
-  // User operations
-  async getCurrentUser() {
-    return this.withRetry(() =>
-      this.request('/user')
-    );
-  }
-
-  async listUserRepositories(options: {
-    type?: 'all' | 'owner' | 'public' | 'private' | 'member';
-    sort?: 'created' | 'updated' | 'pushed' | 'full_name';
+  async listRepositoryIssues(owner: string, repo: string, options: {
+    state?: 'open' | 'closed' | 'all';
     per_page?: number;
     page?: number;
-    searchQuery?: string;
-  } = {}) {
-    // If we have a search query, search for repositories
-    if (options.searchQuery) {
-      // First get the authenticated user's login
-      const user = await this.withRetry(() =>
-        this.request<{ login: string }>('/user')
-      );
-
-      // Build search query using GitHub's search qualifiers
-      const searchQuery = options.searchQuery.toLowerCase();
-
-      // First get all user's repositories that match the query
-      const userRepos = await this.withRetry(() =>
-        this.request<any[]>('/user/repos')
-      ).catch(() => []);
-
-      // Filter user's repos to match the search query
-      const matchingUserRepos = userRepos.filter(repo =>
-        repo.name.toLowerCase().includes(searchQuery)
-      );
-
-      // Then get only public repositories from the global search
-      const query = encodeURIComponent(`${searchQuery} in:name is:public`);
-      const searchResult = await this.withRetry(() =>
-        this.request<GitHubSearchResult>(`/search/repositories?q=${query}&sort=stars&order=desc&per_page=100`)
-      ).catch(() => ({ items: [] }));
-
-      // Combine results, excluding duplicates
-      // User repos (including private ones they have access to) come first
-      const allItems = [...matchingUserRepos];
-      // Then add public repos from search, excluding any duplicates
-      for (const item of searchResult.items) {
-        if (!allItems.some(existing => existing.id === item.id) && !item.private) {
-          allItems.push(item);
-        }
-      }
-
-      // Sort results
-      const sortedItems = allItems.sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
-        const aOwner = a.owner.login.toLowerCase();
-        const bOwner = b.owner.login.toLowerCase();
-        const userLogin = user.login.toLowerCase();
-
-        // First, prioritize exact name matches
-        const aExactMatch = aName === searchQuery;
-        const bExactMatch = bName === searchQuery;
-
-        if (aExactMatch || bExactMatch) {
-          // If at least one is an exact match, use priority + stars system
-          const aPriority = aOwner === userLogin ? 1 : 2;
-          const bPriority = bOwner === userLogin ? 1 : 2;
-
-          // If priorities are different, sort by priority
-          if (aPriority !== bPriority) {
-            return aPriority - bPriority;
-          }
-
-          // If same priority, sort by stars
-          return (b.stargazers_count || 0) - (a.stargazers_count || 0);
-        }
-
-        // For non-exact matches, prioritize by name similarity
-        const aStartsWith = aName.startsWith(searchQuery);
-        const bStartsWith = bName.startsWith(searchQuery);
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
-
-        // Then by user's repositories
-        if (aOwner === userLogin && bOwner !== userLogin) return -1;
-        if (aOwner !== userLogin && bOwner === userLogin) return 1;
-
-        // Finally, sort by stars
-        return (b.stargazers_count || 0) - (a.stargazers_count || 0);
-      });
-
-      // Return top results after sorting
-      return sortedItems.slice(0, options.per_page || 10);
-    }
-
-    // If no search query, get user's repositories
+  } = {}): Promise<any[]> {
     const params = new URLSearchParams({
-      type: options.type || 'all',
-      sort: options.sort || 'updated',
+      state: options.state || 'open',
       per_page: (options.per_page || 100).toString(),
       page: (options.page || 1).toString()
     });
 
-    return this.withRetry(() =>
-      this.request<any[]>(`/user/repos?${params}`)
-    );
+    return this.request<any[]>(`/repos/${owner}/${repo}/issues?${params}`);
   }
 }
 

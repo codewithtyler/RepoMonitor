@@ -7,12 +7,14 @@ export const theme = {
     text: {
       primary: '#c9d1d9',
       secondary: '#8b949e',
-      error: '#f85149'
+      error: '#f85149',
+      inverse: '#ffffff'
     },
     background: {
       primary: '#0d1117',
       secondary: '#161b22',
-      tooltip: '#1c2128'
+      tooltip: '#1c2128',
+      hover: '#21262d'
     },
     border: {
       primary: '#30363d',
@@ -49,4 +51,4 @@ export const theme = {
       }
     }
   }
-} as const; 
+} as const;

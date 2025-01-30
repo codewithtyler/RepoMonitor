@@ -1,77 +1,38 @@
-import { Repository } from '@/types/repository';
-import { GitPullRequest, GitMerge, GitBranch, AlertCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { StatCard } from './stat-card';
+import { theme } from '@/config/theme';
 
 interface GlobalStatsCardProps {
-  repositories: Repository[];
-  variant?: 'default' | 'compact';
-  layoutOrder?: string[];
+  title: string;
+  value: string | number;
+  description?: string;
+  layoutOrder?: number;
 }
 
-export function GlobalStatsCard({ repositories, variant = 'default', layoutOrder = ['trackedRepos', 'analyzedRepos', 'openIssues', 'activeAutomations'] }: GlobalStatsCardProps) {
-  console.log('[GlobalStatsCard] Rendering with repositories:', repositories.length);
-
-  const stats = {
-    trackedRepos: repositories.length,
-    analyzedRepos: repositories.filter(r => r.lastAnalysisTimestamp).length,
-    openIssues: repositories.reduce((sum, r) => sum + (r.openIssuesCount ?? 0), 0),
-    activeAutomations: repositories.filter(r => r.isAnalyzing).length
-  };
-
-  const statsConfig = {
-    trackedRepos: {
-      title: "Tracked Repositories",
-      description: "Total repositories being monitored",
-      icon: GitBranch
-    },
-    analyzedRepos: {
-      title: "Analyzed Repositories",
-      description: "Repositories with completed analysis",
-      icon: GitMerge
-    },
-    openIssues: {
-      title: "Open Issues",
-      description: "Across all repositories",
-      icon: GitPullRequest
-    },
-    activeAutomations: {
-      title: "Active Automations",
-      description: "Currently running analyses",
-      icon: AlertCircle
-    }
-  };
-
-  console.log('[GlobalStatsCard] Calculated stats:', stats);
-
+export function GlobalStatsCard({
+  title,
+  value,
+  description,
+  layoutOrder = 0
+}: GlobalStatsCardProps) {
   return (
-    <motion.div
-      className={variant === 'compact' ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-4 gap-4'}
-      layout="position"
-      transition={{
-        layout: {
-          type: "tween",
-          duration: 5.5,
-          ease: "easeInOut",
-          delay: 0.3
-        }
+    <div
+      className="p-4 rounded-lg border transition-colors"
+      style={{
+        backgroundColor: theme.colors.background.secondary,
+        borderColor: theme.colors.border.primary,
+        order: layoutOrder
       }}
     >
-      {layoutOrder.map((key) => {
-        const config = statsConfig[key as keyof typeof statsConfig];
-        return (
-          <StatCard
-            key={key}
-            id={key}
-            title={config.title}
-            value={stats[key as keyof typeof stats].toString()}
-            description={config.description}
-            icon={config.icon}
-            variant={variant}
-            layoutId={`global-stats-${key}`}
-          />
-        );
-      })}
-    </motion.div>
+      <h3 className="text-sm font-medium" style={{ color: theme.colors.text.secondary }}>
+        {title}
+      </h3>
+      <p className="mt-2 text-3xl font-semibold tracking-tight" style={{ color: theme.colors.text.primary }}>
+        {value}
+      </p>
+      {description && (
+        <p className="mt-2 text-sm" style={{ color: theme.colors.text.secondary }}>
+          {description}
+        </p>
+      )}
+    </div>
   );
 }

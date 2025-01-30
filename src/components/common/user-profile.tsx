@@ -1,100 +1,68 @@
+import { useAuth } from '@/lib/contexts/auth-context';
+import { useUser } from '@/lib/auth/hooks';
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
-import { theme } from '@/config/theme';
-import { motion, AnimatePresence } from 'framer-motion';
-import { getAuthState } from '@/lib/auth/global-state';
+import { ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/auth/supabase-client';
 
 export function UserProfile() {
+  const { signOut } = useAuth();
+  const { user } = useUser();
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
-  const { user } = getAuthState();
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
-    }
+    };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/', { replace: true });
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   if (!user) return null;
 
-  const firstName = user.user_metadata?.name?.split(' ')[0] || 'User';
-  const avatarUrl = user.user_metadata?.avatar_url;
+  // Get first name from user's full name
+  const firstName = user.user_metadata?.full_name?.split(' ')[0] || 'there';
 
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-gray-500/10"
-        style={{ color: theme.colors.text.primary }}
+        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        <div className="flex items-center gap-2">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={`${firstName}'s avatar`}
-              className="w-6 h-6 rounded-full"
-            />
-          ) : (
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: theme.colors.brand.primary }}
-            >
-              <User className="w-4 h-4" />
-            </div>
-          )}
-          <span className="text-sm">Hey {firstName}</span>
-        </div>
-        <ChevronDown className="w-4 h-4" style={{ color: theme.colors.text.secondary }} />
+        <img
+          src={user.user_metadata?.avatar_url}
+          alt="Profile"
+          className="w-6 h-6 rounded-full"
+        />
+        <span className="text-sm text-[#c9d1d9]">Hey {firstName}</span>
+        <ChevronDown className="h-4 w-4 text-[#8b949e]" />
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-48 rounded-lg border shadow-lg"
-            style={{
-              backgroundColor: theme.colors.background.secondary,
-              borderColor: theme.colors.border.primary,
-              zIndex: 9999
-            }}
-          >
-            <div className="p-1">
-              <button
-                onClick={() => navigate('/settings')}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-gray-500/10"
-                style={{ color: theme.colors.text.primary }}
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-gray-500/10"
-                style={{ color: theme.colors.text.primary }}
-              >
-                <LogOut className="w-4 h-4" />
-                Sign Out
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 rounded-lg bg-[#161b22] border border-[#30363d] shadow-lg overflow-hidden">
+          <div className="py-2">
+            <button
+              onClick={handleSignOut}
+              className="w-full px-4 py-2 text-left text-sm text-[#f85149] hover:bg-[#21262d] transition-colors"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
