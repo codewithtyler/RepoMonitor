@@ -26,7 +26,7 @@ export function AuthCallback() {
   const redirectAttemptedRef = useRef(false);
   const { user, loading } = useUser();
   const tokenCheckAttempts = useRef(0);
-  const maxAttempts = 10;
+  const maxAttempts = 5;
 
   useEffect(() => {
     let mounted = true;
@@ -48,10 +48,10 @@ export function AuthCallback() {
         } else {
           tokenCheckAttempts.current++;
           if (tokenCheckAttempts.current < maxAttempts) {
-            setStatus(`Processing authentication... (attempt ${tokenCheckAttempts.current}/${maxAttempts})`);
-            tokenCheckTimeout = setTimeout(checkForToken, 1000);
+            setStatus('Completing GitHub authentication...');
+            tokenCheckTimeout = setTimeout(checkForToken, 2000);
           } else if (mounted) {
-            setError('Unable to retrieve GitHub token. Please try logging in again.');
+            setError('Unable to complete GitHub authentication. Please try again.');
             setTimeout(() => navigate('/', { replace: true }), 3000);
           }
         }
@@ -78,7 +78,7 @@ export function AuthCallback() {
           return;
         }
 
-        setStatus('Processing authentication...');
+        setStatus('Connecting to GitHub...');
         checkForToken();
       } catch (error) {
         logger.error('[AuthCallback] Error in callback:', error);
@@ -98,7 +98,7 @@ export function AuthCallback() {
         clearTimeout(tokenCheckTimeout);
       }
     };
-  }, [navigate, user, loading, returnTo]);
+  }, [user, loading, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[#0d1117]">

@@ -20,21 +20,13 @@ export class GitHubTokenManager {
       isBase64: /^[A-Za-z0-9+/=]+$/.test(cleanToken)
     });
 
-    // GitHub OAuth tokens are 40 characters long
-    // Fine-grained tokens start with 'gho_' and are at least 40 characters
-    // Personal access tokens start with 'ghp_'
-    const isValid = cleanToken.length >= 40 && (
-      cleanToken.startsWith('gho_') ||
-      cleanToken.startsWith('ghp_') ||
-      /^[A-Za-z0-9]{40}$/.test(cleanToken) // Classic OAuth token format
-    );
+    // Accept any non-empty token that's at least 40 characters
+    // GitHub tokens can vary in format (OAuth, fine-grained, PAT)
+    const isValid = cleanToken.length >= 40;
 
     if (!isValid) {
-      logger.debug('[GitHubTokenManager] Token validation failed: invalid format', {
-        length: cleanToken.length,
-        format: cleanToken.startsWith('gho_') ? 'fine-grained' :
-          cleanToken.startsWith('ghp_') ? 'personal-access' :
-            cleanToken.length === 40 ? 'classic' : 'unknown'
+      logger.debug('[GitHubTokenManager] Token validation failed: invalid length', {
+        length: cleanToken.length
       });
     }
 
@@ -129,8 +121,8 @@ export class GitHubTokenManager {
   }
 
   private static async handleRetry(userId: string, retryCount: number, reason: string): Promise<string | null> {
-    const maxRetries = 3;
-    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff, max 5 seconds
+    const maxRetries = 5; // Increased from 3 to 5
+    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 8000); // Increased max delay to 8 seconds
 
     if (retryCount < maxRetries) {
       logger.info(`[GitHubTokenManager] Retrying token retrieval in ${retryDelay}ms`, {

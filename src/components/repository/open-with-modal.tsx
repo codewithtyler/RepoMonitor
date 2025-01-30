@@ -7,8 +7,9 @@ interface OpenWithModalProps {
 }
 
 export function OpenWithModal({ isOpen, onClose }: OpenWithModalProps) {
-    if (!isOpen) return null;
     const navigate = useNavigate();
+
+    if (!isOpen) return null;
 
     const handleOpenWith = () => {
         onClose();
