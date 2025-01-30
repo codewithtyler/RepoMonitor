@@ -135,13 +135,13 @@ export function Dashboard() {
 
   const stats = [
     {
-      title: 'Total Repositories',
+      title: 'Repositories',
       value: trackedRepositories.length,
       description: 'Total number of tracked repositories',
       layoutOrder: 1
     },
     {
-      title: 'Global Open Issues',
+      title: 'Open Issues',
       value: openIssuesCount,
       description: 'Across all tracked repositories',
       layoutOrder: 2
