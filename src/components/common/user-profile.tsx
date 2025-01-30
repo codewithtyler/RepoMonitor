@@ -1,78 +1,65 @@
-import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/contexts/auth-context';
-import { supabase } from '@/lib/auth/supabase-client';
-import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
-import { Button } from './button';
-import { cn } from '@/lib/utils';
-import type { User } from '@supabase/supabase-js';
-
-interface AuthContext {
-  user: User | null;
-  loading: boolean;
-}
+import { useUser } from '@/lib/auth/hooks';
+import { Button } from '@/components/common/button';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function UserProfile() {
-  const navigate = useNavigate();
-  const auth = useAuth() as AuthContext;
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { signOut } = useAuth();
+  const { user } = useUser();
+  const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSignOut = async () => {
     try {
-      // Clear GitHub tokens first
-      if (auth.user?.id) {
-        await GitHubTokenManager.clearToken(auth.user.id);
-      }
-
-      // Clear local storage
-      localStorage.clear();
-
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-
-      // Reload the page to reset all state
-      window.location.href = '/';
+      await signOut();
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  if (!auth.user) {
-    return null;
-  }
+  if (!user) return null;
+
+  // Get first name from user's full name
+  const firstName = user.user_metadata?.full_name?.split(' ')[0] || 'there';
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <Button
-        variant="ghost"
-        className="flex items-center space-x-2"
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
         <img
-          src={auth.user.user_metadata?.avatar_url}
-          alt={auth.user.user_metadata?.user_name || 'User avatar'}
+          src={user.user_metadata?.avatar_url}
+          alt="Profile"
           className="w-6 h-6 rounded-full"
         />
-        <span className="text-sm font-medium">{auth.user.user_metadata?.user_name}</span>
-      </Button>
+        <span className="text-sm text-[#c9d1d9]">Hey {firstName}</span>
+        <ChevronDown className="h-4 w-4 text-[#8b949e]" />
+      </button>
 
-      {isDropdownOpen && (
-        <div className={cn(
-          'absolute right-0 mt-2 w-48 rounded-md shadow-lg',
-          'bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5'
-        )}>
-          <div className="py-1" role="menu" aria-orientation="vertical">
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 rounded-lg bg-[#161b22] border border-[#30363d] shadow-lg overflow-hidden">
+          <div className="py-2">
             <button
               onClick={handleSignOut}
-              className={cn(
-                'block w-full px-4 py-2 text-sm text-left',
-                'text-gray-700 dark:text-gray-200',
-                'hover:bg-gray-100 dark:hover:bg-gray-700'
-              )}
-              role="menuitem"
+              className="w-full px-4 py-2 text-left text-sm text-[#f85149] hover:bg-[#21262d] transition-colors"
             >
-              Sign out
+              Sign Out
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
-export const WorkInProgress = () => {
+export function WorkInProgress() {
     const navigate = useNavigate();
 
     return (
@@ -31,4 +31,4 @@ export const WorkInProgress = () => {
             </div>
         </div>
     );
-};
+}

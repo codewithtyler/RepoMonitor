@@ -42,10 +42,28 @@ export interface SearchContextType {
   clearSearch: () => void;
 }
 
-const SearchContext = createContext<SearchContextType | null>(null);
+const defaultContext: SearchContextType = {
+  query: '',
+  setQuery: () => { },
+  results: [],
+  allResults: [],
+  loading: false,
+  error: null,
+  recentSearches: [],
+  removeRecentSearch: () => { },
+  clearRecentSearches: () => { },
+  hasMore: false,
+  loadMore: () => { },
+  selectResult: () => { },
+  selectRecentSearch: () => { },
+  search: async () => { },
+  addToRecentSearches: () => { },
+  clearSearch: () => { }
+};
+
+const SearchContext = createContext<SearchContextType>(defaultContext);
 
 const MAX_RECENT_SEARCHES = 5;
-const INITIAL_PAGE_SIZE = 30;  // Maximum results from API
 const DISPLAY_BATCH_SIZE = 10;  // Number of results to show per batch
 const CACHE_DURATION = 300000;  // Cache duration (5 minutes)
 const MIN_SEARCH_CHARS = 3;  // Minimum characters required for search
@@ -268,8 +286,8 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
 export function useSearch(): SearchContextType {
   const context = useContext(SearchContext);
-  if (context === null) {
+  if (!context) {
     throw new Error('useSearch must be used within a SearchProvider');
   }
-  return context;
+  return context as SearchContextType;
 }

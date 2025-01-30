@@ -19,7 +19,16 @@ interface AnalysisContextType {
     clearSelection: () => void;
 }
 
-const AnalysisContext = createContext<AnalysisContextType | null>(null);
+const defaultContext: AnalysisContextType = {
+    selectedRepository: null,
+    analysisState: null,
+    recentlyAnalyzed: [],
+    selectRepository: () => { },
+    startAnalysis: async () => { },
+    clearSelection: () => { }
+};
+
+const AnalysisContext = createContext<AnalysisContextType>(defaultContext);
 
 export function AnalysisProvider({ children }: { children: React.ReactNode }) {
     const [selectedRepository, setSelectedRepository] = useState<(Repository | SearchResult) | null>(null);
@@ -91,8 +100,8 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
 
 export function useAnalysis(): AnalysisContextType {
     const context = useContext(AnalysisContext);
-    if (context === null) {
+    if (!context) {
         throw new Error('useAnalysis must be used within an AnalysisProvider');
     }
-    return context;
+    return context as AnalysisContextType;
 }

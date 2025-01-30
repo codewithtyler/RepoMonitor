@@ -3,7 +3,6 @@ import { useSearch } from '@/lib/contexts/search-context';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { SearchResultsDropdown } from './search-results-dropdown';
 import type { SearchResult } from '@/lib/contexts/search-context';
-import { cn } from '@/lib/utils';
 
 export const SearchBar = () => {
   const [query, setQuery] = useState('');
@@ -90,7 +89,7 @@ export const SearchBar = () => {
           onFocus={handleFocus}
           onBlur={handleBlur}
           placeholder="Search repositories..."
-          className="w-full px-4 py-2 text-sm bg-[#0d1117] border rounded-md border-[#30363d] focus:outline-none focus:ring-2 focus:ring-[#2ea043] text-[#c9d1d9] placeholder-[#8b949e]"
+          className="w-full px-4 py-2 text-sm bg-[#0d1117] border rounded-lg border-[#30363d] focus:outline-none focus:ring-2 focus:ring-[#2ea043] text-[#c9d1d9] placeholder-[#8b949e]"
           aria-label="Search repositories"
           spellCheck={false}
           autoComplete="off"

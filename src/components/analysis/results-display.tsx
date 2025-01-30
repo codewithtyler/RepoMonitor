@@ -71,7 +71,7 @@ export function ResultsDisplay({ repositoryUrl, issues }: ResultsDisplayProps) {
                     <ChevronRight className="h-5 w-5" />
                   )}
                 </div>
-                
+
                 <div>
                   <div className="flex items-center space-x-2">
                     <a
@@ -85,10 +85,10 @@ export function ResultsDisplay({ repositoryUrl, issues }: ResultsDisplayProps) {
                     </a>
                     <span className="font-medium">{issue.title}</span>
                   </div>
-                  
+
                   <div className="flex gap-2 mt-1">
                     {issue.labels.map(label => (
-                      <Badge key={label} variant="secondary">
+                      <Badge key={label} variant="default">
                         {label}
                       </Badge>
                     ))}
@@ -97,7 +97,7 @@ export function ResultsDisplay({ repositoryUrl, issues }: ResultsDisplayProps) {
               </div>
 
               <div className="flex items-center space-x-2">
-                <Badge variant="outline">
+                <Badge variant="default">
                   {issue.duplicates.length} duplicates
                 </Badge>
                 <a
@@ -154,4 +154,4 @@ export function ResultsDisplay({ repositoryUrl, issues }: ResultsDisplayProps) {
       </div>
     </div>
   );
-} 
+}

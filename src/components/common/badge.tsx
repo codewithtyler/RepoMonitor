@@ -1,15 +1,15 @@
-import { type ButtonHTMLAttributes, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
 // All components are built from scratch using TailwindCSS for styling.
 
-type BadgeVariant = 'default' | 'secondary' | 'outline' | 'destructive';
+type BadgeVariant = 'default' | 'success' | 'warning' | 'error';
 
 interface BadgeProps {
+  children: ReactNode;
   variant?: BadgeVariant;
-  children?: ReactNode;
   className?: string;
   onClick?: () => void;
 }
@@ -20,11 +20,11 @@ export function Badge({
   children,
   ...props
 }: BadgeProps) {
-  const variantClasses: Record<BadgeVariant, string> = {
-    default: 'bg-primary text-primary-foreground hover:bg-primary/80',
-    secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-    outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-    destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/80'
+  const variantClasses = {
+    default: 'bg-[#30363d] text-[#8b949e]',
+    success: 'bg-[#238636] text-white',
+    warning: 'bg-[#9e6a03] text-white',
+    error: 'bg-[#f85149] text-white'
   };
 
   return (

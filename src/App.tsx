@@ -1,14 +1,23 @@
-import { RootProvider } from '@/components/layout/root-provider';
-import { AppRoutes } from '@/components/layout/app-routes';
+import { Routes, Route } from 'react-router-dom';
+import { Dashboard } from '@/pages/Dashboard';
+import { WorkInProgress } from '@/pages/WorkInProgress';
+import { AuthProvider } from '@/lib/contexts/auth-context';
+import { SearchProvider } from '@/lib/contexts/search-context';
+import { AnalysisProvider } from '@/lib/contexts/analysis-context';
 import { Toaster } from 'sonner';
 
 export function App() {
   return (
-    <RootProvider>
-      <div className="flex min-h-screen flex-col bg-background font-sans antialiased">
-        <AppRoutes />
-        <Toaster />
-      </div>
-    </RootProvider>
+    <AuthProvider>
+      <SearchProvider>
+        <AnalysisProvider>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/work-in-progress" element={<WorkInProgress />} />
+          </Routes>
+          <Toaster />
+        </AnalysisProvider>
+      </SearchProvider>
+    </AuthProvider>
   );
 }

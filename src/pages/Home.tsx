@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/auth/supabase-client';
 import { HeaderLogo } from '@/components/layout/header-logo';
 import { GitHubLoginButton } from '@/components/auth/github-login-button';

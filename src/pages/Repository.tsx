@@ -1,8 +1,10 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { RepositoryDetailView } from '@/components/repository/repository-detail-view';
+import type { SearchResult } from '@/lib/contexts/search-context';
 
 export function Repository() {
     const { owner, name } = useParams<{ owner: string; name: string }>();
+    const navigate = useNavigate();
 
     if (!owner || !name) {
         return (
@@ -12,5 +14,24 @@ export function Repository() {
         );
     }
 
-    return <RepositoryDetailView owner={owner} name={name} />;
+    const repository: SearchResult = {
+        id: 0, // This will be updated when details are loaded
+        owner,
+        name,
+        description: null,
+        url: `https://github.com/${owner}/${name}`,
+        visibility: 'public',
+        stargazersCount: 0,
+        forksCount: 0,
+        openIssuesCount: 0,
+        subscribersCount: 0,
+        isFork: false
+    };
+
+    return (
+        <RepositoryDetailView
+            repository={repository}
+            onBack={() => navigate(-1)}
+        />
+    );
 }
