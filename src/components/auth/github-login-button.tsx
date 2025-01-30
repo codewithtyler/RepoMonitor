@@ -25,7 +25,9 @@ export function GitHubLoginButton({ returnTo }: GitHubLoginButtonProps) {
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
-                    }
+                        response_type: 'code',
+                    },
+                    skipBrowserRedirect: false,
                 }
             });
 

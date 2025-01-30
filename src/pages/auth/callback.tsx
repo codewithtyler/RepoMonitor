@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { getAuthState } from '@/lib/auth/global-state';
 import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
+import { supabase } from '@/lib/auth/supabase-client';
 
 export async function loader() {
   logger.debug('[Auth Loader] Starting loader function');
@@ -20,13 +21,12 @@ export async function loader() {
 export function AuthCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get('returnTo');
   const [status, setStatus] = useState('Initializing...');
   const [error, setError] = useState<string | null>(null);
   const redirectAttemptedRef = useRef(false);
   const { user, loading } = useUser();
   const tokenCheckAttempts = useRef(0);
-  const maxAttempts = 5;
+  const maxAttempts = 10;
 
   useEffect(() => {
     let mounted = true;
@@ -36,20 +36,39 @@ export function AuthCallback() {
       if (!user || tokenCheckAttempts.current >= maxAttempts) return;
 
       try {
-        const providerToken = user.app_metadata?.provider_token;
+        if (tokenCheckAttempts.current === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Get the current session to ensure we have fresh data
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
+        const providerToken = session?.provider_token;
+        logger.debug('[AuthCallback] Session check:', {
+          hasSession: !!session,
+          hasProviderToken: !!providerToken,
+          attempt: tokenCheckAttempts.current
+        });
+
         if (providerToken) {
           logger.debug('[AuthCallback] Found provider token, storing...');
           await GitHubTokenManager.storeToken(user.id, providerToken);
           if (mounted) {
             setStatus('Redirecting to dashboard...');
             redirectAttemptedRef.current = true;
-            navigate('/dashboard', { replace: true });
+            const returnTo = searchParams.get('returnTo');
+            navigate(returnTo || '/dashboard', { replace: true });
           }
         } else {
           tokenCheckAttempts.current++;
           if (tokenCheckAttempts.current < maxAttempts) {
             setStatus('Completing GitHub authentication...');
-            tokenCheckTimeout = setTimeout(checkForToken, 2000);
+            const delay = Math.min(1000 * Math.pow(1.5, tokenCheckAttempts.current - 1), 4000);
+            tokenCheckTimeout = setTimeout(checkForToken, delay);
           } else if (mounted) {
             setError('Unable to complete GitHub authentication. Please try again.');
             setTimeout(() => navigate('/', { replace: true }), 3000);
@@ -98,7 +117,7 @@ export function AuthCallback() {
         clearTimeout(tokenCheckTimeout);
       }
     };
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, searchParams]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[#0d1117]">
