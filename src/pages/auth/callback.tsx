@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { redirect, useNavigate } from 'react-router-dom';
+import { redirect, useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser } from '@/lib/auth/hooks';
 import { Loader2 } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { getAuthState } from '@/lib/auth/global-state';
+import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
 
 export async function loader() {
   logger.debug('[Auth Loader] Starting loader function');
@@ -18,89 +19,72 @@ export async function loader() {
 
 export function AuthCallback() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const [status, setStatus] = useState('Initializing...');
   const [error, setError] = useState<string | null>(null);
   const redirectAttemptedRef = useRef(false);
   const { user, loading } = useUser();
+  const tokenCheckAttempts = useRef(0);
+  const maxAttempts = 5;
 
   useEffect(() => {
     let mounted = true;
+    let tokenCheckTimeout: NodeJS.Timeout;
 
-    async function handleCallback() {
-      if (redirectAttemptedRef.current) {
-        logger.debug('[AuthCallback] Redirect already attempted, skipping');
-        return;
-      }
+    async function checkForToken() {
+      if (!user || tokenCheckAttempts.current >= maxAttempts) return;
 
       try {
-        logger.debug('[AuthCallback] Starting callback handler', { loading, hasUser: !!user });
-        if (mounted) setStatus('Starting authentication...');
+        const providerToken = user.app_metadata?.provider_token;
+        if (providerToken) {
+          logger.debug('[AuthCallback] Found provider token, storing...');
+          await GitHubTokenManager.storeToken(user.id, providerToken);
+          if (mounted) {
+            setStatus('Redirecting to dashboard...');
+            redirectAttemptedRef.current = true;
+            navigate('/dashboard', { replace: true });
+          }
+        } else {
+          tokenCheckAttempts.current++;
+          if (tokenCheckAttempts.current < maxAttempts) {
+            tokenCheckTimeout = setTimeout(checkForToken, 1000);
+          } else if (mounted) {
+            setError('Unable to retrieve GitHub token. Please try logging in again.');
+            setTimeout(() => navigate('/', { replace: true }), 2000);
+          }
+        }
+      } catch (error) {
+        logger.error('[AuthCallback] Error checking token:', error);
+        if (mounted) {
+          setError('Error processing authentication. Please try again.');
+          setTimeout(() => navigate('/', { replace: true }), 2000);
+        }
+      }
+    }
 
+    async function handleCallback() {
+      if (redirectAttemptedRef.current) return;
+
+      try {
         if (loading) {
-          logger.debug('[AuthCallback] Still loading user state');
-          if (mounted) setStatus('Loading user state...');
+          setStatus('Loading user state...');
           return;
         }
 
         if (!user) {
-          logger.debug('[AuthCallback] No user found after loading');
-          if (mounted) {
-            setStatus('No user found, redirecting...');
-            setError('Authentication failed - no user found');
-          }
-          redirectAttemptedRef.current = true;
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          navigate('/', { replace: true });
+          setStatus('Completing authentication...');
           return;
         }
 
-        logger.debug('[AuthCallback] User found:', {
-          id: user.id,
-          provider: user.app_metadata?.provider
-        });
-
-        if (mounted) setStatus('Authenticating with GitHub...');
-
-        // Store the token if available
-        if (user.app_metadata?.provider === 'github') {
-          const providerToken = user.app_metadata.provider_token;
-          if (providerToken) {
-            logger.debug('[AuthCallback] Storing GitHub token');
-            await GitHubTokenManager.storeToken(user.id, providerToken);
-            if (mounted) setStatus('GitHub token stored successfully');
-          } else {
-            logger.warn('[AuthCallback] No provider token found in user metadata');
-            if (mounted) {
-              setError('No GitHub access token found');
-              setStatus('Authentication failed');
-              redirectAttemptedRef.current = true;
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              navigate('/', { replace: true });
-              return;
-            }
-          }
-        } else {
-          logger.warn('[AuthCallback] User not authenticated through GitHub');
-          if (mounted) {
-            setError('Not authenticated through GitHub');
-            setStatus('Authentication failed');
-            redirectAttemptedRef.current = true;
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            navigate('/', { replace: true });
-            return;
-          }
-        }
-
-        // Redirect to dashboard
-        logger.debug('[AuthCallback] Authentication successful, redirecting to dashboard');
-        if (mounted) setStatus('Redirecting to dashboard...');
-        redirectAttemptedRef.current = true;
-        navigate('/dashboard', { replace: true });
+        setStatus('Processing authentication...');
+        checkForToken();
       } catch (error) {
         logger.error('[AuthCallback] Error in callback:', error);
         if (mounted) {
           setStatus('Authentication failed');
           setError(error instanceof Error ? error.message : 'Unknown error occurred');
+          setTimeout(() => navigate('/', { replace: true }), 2000);
         }
       }
     }
@@ -109,8 +93,11 @@ export function AuthCallback() {
 
     return () => {
       mounted = false;
+      if (tokenCheckTimeout) {
+        clearTimeout(tokenCheckTimeout);
+      }
     };
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, returnTo]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[#0d1117]">

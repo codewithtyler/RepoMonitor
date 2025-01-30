@@ -107,4 +107,24 @@ export class GitHubTokenManager {
     }
     localStorage.removeItem(TOKEN_STORAGE_KEY);
   }
+
+  static clearAllTokens() {
+    try {
+      // Clear all tokens from localStorage
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('github_token_')) {
+          localStorage.removeItem(key);
+        }
+      });
+
+      // Clear the main token storage
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+
+      logger.info('[GitHubTokenManager] All tokens cleared successfully');
+    } catch (error) {
+      logger.error('[GitHubTokenManager] Error clearing tokens:', error);
+      throw error;
+    }
+  }
 }

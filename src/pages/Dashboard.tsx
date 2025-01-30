@@ -19,6 +19,8 @@ import type { GitHubClient } from '@/lib/github';
 import { ActiveAnalysisGlobalCard } from '@/components/analysis/active-analysis-global-card';
 import { useActiveAnalyses } from '@/lib/contexts/active-analyses-context';
 import { OpenWithModal } from '@/components/repository/open-with-modal';
+import { useAuth } from '@/lib/contexts/auth-context';
+import { GitHubLoginButton } from '@/components/auth/github-login-button';
 
 interface Stats {
   title: string;
@@ -28,6 +30,7 @@ interface Stats {
 }
 
 export const Dashboard = () => {
+  const { user, loading: authLoading } = useAuth();
   const { data: repositories, isLoading, error } = useRepositoriesData();
   const { selectedRepository, recentlyAnalyzed, selectRepository } = useAnalysis() as {
     selectedRepository: Repository | null;
@@ -64,6 +67,46 @@ export const Dashboard = () => {
       console.error('Failed to start analysis:', error);
     }
   };
+
+  // Show login screen if no user
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#0d1117] text-[#c9d1d9]">
+        <header className="h-14 border-b border-[#30363d]">
+          <div className="flex items-center justify-between px-4 h-full">
+            <div className="w-48">
+              <HeaderLogo />
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-6">Welcome to RepoMonitor</h2>
+            <p className="text-[#8b949e] mb-8">Sign in with GitHub to get started</p>
+            <GitHubLoginButton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#0d1117] text-[#c9d1d9]">
+        <header className="h-14 border-b border-[#30363d]">
+          <div className="flex items-center justify-between px-4 h-full">
+            <div className="w-48">
+              <HeaderLogo />
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#8b949e] border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

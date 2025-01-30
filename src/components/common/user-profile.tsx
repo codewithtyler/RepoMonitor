@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/auth/supabase-client';
 import { useUser } from '@/lib/auth/hooks';
 import { ChevronDown } from 'lucide-react';
+import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
 
 export function UserProfile() {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,17 +24,20 @@ export function UserProfile() {
 
   const handleSignOut = async () => {
     try {
+      // Clear GitHub tokens first
+      if (user) {
+        GitHubTokenManager.clearAllTokens();
+      }
+
+      // Clear all local storage data
+      localStorage.clear();
+
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
-      // Clear any local storage data
-      localStorage.clear();
-
-      // Navigate to home page
-      navigate('/');
-
-      // Close the dropdown
-      setIsOpen(false);
+      // Force a full page reload and redirect to home
+      window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
     }

@@ -2,14 +2,25 @@ import { Github } from 'lucide-react';
 import { supabase } from '@/lib/auth/supabase-client';
 import { logger } from '@/lib/utils/logger';
 
-export function GitHubLoginButton() {
+interface GitHubLoginButtonProps {
+    returnTo?: string | null;
+}
+
+export function GitHubLoginButton({ returnTo }: GitHubLoginButtonProps) {
     const handleGitHubSignIn = async () => {
         try {
             logger.debug('[GitHubLoginButton] Starting GitHub sign in');
+
+            // Build the callback URL with the return path
+            const callbackUrl = new URL('/auth/callback', window.location.origin);
+            if (returnTo) {
+                callbackUrl.searchParams.set('returnTo', returnTo);
+            }
+
             const { data, error } = await supabase.auth.signInWithOAuth({
                 provider: 'github',
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: callbackUrl.toString(),
                     scopes: 'repo read:user user:email',
                     queryParams: {
                         access_type: 'offline',

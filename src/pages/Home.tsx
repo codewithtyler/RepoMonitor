@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/auth/supabase-client';
 import { HeaderLogo } from '@/components/layout/header-logo';
 import { GitHubLoginButton } from '@/components/auth/github-login-button';
@@ -7,20 +7,36 @@ import { motion } from 'framer-motion';
 
 export function Home() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from || '/dashboard';
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        // If user is already logged in, redirect them back to their previous page
-        navigate(from, { replace: true });
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+
+        if (session?.user) {
+          // If user is authenticated, redirect them
+          if (returnTo) {
+            // Validate the return path is internal
+            const url = new URL(returnTo, window.location.origin);
+            if (url.origin === window.location.origin) {
+              navigate(returnTo, { replace: true });
+              return;
+            }
+          }
+          // Default to dashboard if no valid return path
+          navigate('/dashboard', { replace: true });
+        }
+      } catch (error) {
+        console.error('Error checking session:', error);
+        // On error, stay on home page
       }
     };
 
     checkSession();
-  }, [navigate, from]);
+  }, [navigate, returnTo]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0d1117]">
@@ -53,7 +69,7 @@ export function Home() {
           </div>
 
           <div className="flex justify-center">
-            <GitHubLoginButton />
+            <GitHubLoginButton returnTo={returnTo} />
           </div>
 
           <div className="grid grid-cols-1 gap-6 mt-12">

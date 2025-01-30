@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/auth/supabase-client';
 import { useUser } from '@/lib/auth/hooks';
 import { logger } from '@/lib/utils/logger';
+import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
 
 type AuthContextType = {
     user: User | null;
@@ -45,8 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         try {
+            // Clear all GitHub tokens first
+            GitHubTokenManager.clearAllTokens();
+
+            // Clear any other app state
+            localStorage.removeItem('trackedRepositories');
+            localStorage.removeItem('totalRepositories');
+
+            // Sign out from Supabase
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
+
+            // Force reload the page to clear all in-memory state
+            window.location.href = '/';
         } catch (error) {
             logger.error('[AuthProvider] Sign out error:', error);
             throw error;
