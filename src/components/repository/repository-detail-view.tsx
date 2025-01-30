@@ -1,8 +1,14 @@
-import { GitBranch, GitMerge, GitPullRequest, AlertCircle, ArrowLeft } from 'lucide-react';
+import { GitBranch, GitMerge, GitPullRequest, AlertCircle, ArrowLeft, ChevronDown } from 'lucide-react';
 import { theme } from '@/config/theme';
 import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
 import { RepoStatsCard } from '@/components/common/repo-stats-card';
+import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { OpenWithModal } from './open-with-modal';
+import { Button } from '@/components/common/button';
+import { Badge } from '@/components/common/badge';
+import { CustomScrollbar } from '@/components/common/custom-scrollbar';
 
 interface RepositoryDetailViewProps {
   owner: string;
@@ -12,6 +18,23 @@ interface RepositoryDetailViewProps {
 export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps) {
   const { data: repository, isLoading } = useRepositoryDetails(owner, name);
   const { analysisState, startAnalysis, clearSelection } = useAnalysis();
+  const navigate = useNavigate();
+  const [selectedAction, setSelectedAction] = useState<'analyze' | 'track'>('analyze');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (isLoading || !repository) {
     return (
@@ -29,8 +52,54 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
     }
   };
 
+  const handleTrackRepository = async () => {
+    if (!repository) return;
+
+    try {
+      // Get existing tracked repositories from localStorage
+      const trackedRepos = JSON.parse(localStorage.getItem('trackedRepositories') || '[]');
+
+      // Check if repository is already tracked
+      const isAlreadyTracked = trackedRepos.some(
+        (repo: any) => repo.owner === repository.owner && repo.name === repository.name
+      );
+
+      if (isAlreadyTracked) {
+        // Remove from tracked repositories if already tracked
+        const updatedRepos = trackedRepos.filter(
+          (repo: any) => !(repo.owner === repository.owner && repo.name === repository.name)
+        );
+        localStorage.setItem('trackedRepositories', JSON.stringify(updatedRepos));
+
+        // Decrement total repositories count
+        const currentTotal = parseInt(localStorage.getItem('totalRepositories') || '0');
+        localStorage.setItem('totalRepositories', Math.max(0, currentTotal - 1).toString());
+      } else {
+        // Add to tracked repositories
+        trackedRepos.push({
+          owner: repository.owner,
+          name: repository.name,
+          id: repository.id,
+          description: repository.description,
+          openIssuesCount: repository.openIssuesCount
+        });
+        localStorage.setItem('trackedRepositories', JSON.stringify(trackedRepos));
+
+        // Increment total repositories count
+        const currentTotal = parseInt(localStorage.getItem('totalRepositories') || '0');
+        localStorage.setItem('totalRepositories', (currentTotal + 1).toString());
+      }
+
+      // Force a re-render of components
+      window.dispatchEvent(new Event('storage'));
+    } catch (error) {
+      console.error('Failed to track repository:', error);
+    }
+  };
+
   const handleBackToDashboard = () => {
     clearSelection();
+    navigate('/');
   };
 
   // Helper function to get phase progress percentage
@@ -85,22 +154,46 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
     );
   };
 
+  const handleActionClick = () => {
+    if (selectedAction === 'analyze') {
+      handleStartAnalysis();
+    } else {
+      handleTrackRepository();
+    }
+  };
+
+  const getTrackButtonText = () => {
+    // Get existing tracked repositories from localStorage
+    const trackedRepos = JSON.parse(localStorage.getItem('trackedRepositories') || '[]');
+    const isTracked = trackedRepos.some(
+      (repo: any) => repo.owner === repository.owner && repo.name === repository.name
+    );
+    return isTracked ? 'Untrack Repository' : 'Track Repository';
+  };
+
   return (
     <div className="space-y-8">
       {/* Back to Dashboard */}
       <button
         onClick={handleBackToDashboard}
-        className="flex items-center gap-2 text-sm font-medium hover:opacity-80 transition-opacity"
+        className="flex items-center gap-2 text-sm font-medium transition-all duration-200 ease-in-out hover:opacity-80"
         style={{ color: theme.colors.text.secondary }}
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-4 w-4 transition-transform duration-200 ease-in-out group-hover:-translate-x-1" />
         Back to Dashboard
       </button>
 
       {/* Repository Name */}
       <div>
         <h2 className="text-2xl font-bold" style={{ color: theme.colors.text.primary }}>
-          {repository.owner}/{repository.name}
+          <a
+            href={`https://github.com/${repository.owner}/${repository.name}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline hover:text-[#2ea043] transition-colors"
+          >
+            {repository.owner}/{repository.name}
+          </a>
         </h2>
         {repository.description && (
           <p className="mt-2" style={{ color: theme.colors.text.secondary }}>
@@ -155,13 +248,51 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
             </p>
           </div>
           {/* Analysis Button */}
-          <button
-            onClick={handleStartAnalysis}
-            className="px-4 py-2 rounded-lg text-white transition-colors"
-            style={{ backgroundColor: theme.colors.brand.primary }}
-          >
-            {analysisState?.phase === 'complete' ? 'Re-Analyze' : 'Start Analysis'}
-          </button>
+          <div className="relative inline-block" ref={dropdownRef}>
+            <div className="flex">
+              <button
+                onClick={handleActionClick}
+                className={`px-4 py-2 rounded-l-lg transition-colors w-[200px] ${selectedAction === 'analyze'
+                  ? 'bg-[#238636] hover:bg-[#2ea043] text-white'
+                  : 'bg-[#ffd33d] hover:bg-[#ffdf5d] text-black'
+                  }`}
+              >
+                {selectedAction === 'analyze'
+                  ? (analysisState?.phase === 'complete' ? 'Re-Analyze Repository' : 'Analyze Repository')
+                  : getTrackButtonText()}
+              </button>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className={`px-2 py-2 rounded-r-lg transition-colors border-l border-white/20 ${selectedAction === 'analyze'
+                  ? 'bg-[#238636] hover:bg-[#2ea043] text-white'
+                  : 'bg-[#ffd33d] hover:bg-[#ffdf5d] text-black'
+                  }`}
+                aria-label="Show more options"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Dropdown Menu */}
+            <div
+              className={`absolute right-0 mt-2 w-[232px] rounded-lg shadow-lg bg-[#21262d] border border-[#30363d] z-10 ${isDropdownOpen ? '' : 'hidden'
+                }`}
+            >
+              <button
+                onClick={() => {
+                  setSelectedAction(selectedAction === 'analyze' ? 'track' : 'analyze');
+                  setIsDropdownOpen(false);
+                }}
+                className={`w-full px-4 py-2 text-left transition-colors rounded-lg ${selectedAction === 'analyze'
+                  ? 'bg-[#ffd33d] hover:bg-[#ffdf5d] text-black'
+                  : 'bg-[#238636] hover:bg-[#2ea043] text-white'
+                  }`}
+              >
+                {selectedAction === 'analyze'
+                  ? getTrackButtonText()
+                  : (analysisState?.phase === 'complete' ? 'Re-Analyze Repository' : 'Analyze Repository')}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Analysis Progress */}

@@ -6,7 +6,11 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic',
+      jsxImportSource: 'react',
+      include: '**/*.{jsx,tsx}',
+    }),
     nodePolyfills({
       globals: {
         global: true,

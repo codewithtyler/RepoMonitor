@@ -1,82 +1,80 @@
-import { useState, useEffect, useRef } from 'react';
-import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
+import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { supabase } from '@/lib/auth/supabase-client';
-import { theme } from '@/config/theme';
-import { ChevronDown } from 'lucide-react';
+import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
+import { Button } from './button';
+import { cn } from '@/lib/utils';
+import type { User } from '@supabase/supabase-js';
+
+interface AuthContext {
+  user: User | null;
+  loading: boolean;
+}
 
 export function UserProfile() {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    user: null,
-    loading: true
-  });
-  const [showDropdown, setShowDropdown] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToAuth(setState);
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const navigate = useNavigate();
+  const auth = useAuth() as AuthContext;
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear GitHub tokens first
+      if (auth.user?.id) {
+        await GitHubTokenManager.clearToken(auth.user.id);
+      }
+
+      // Clear local storage
+      localStorage.clear();
+
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+
+      // Reload the page to reset all state
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
-  if (!state.user) {
+  if (!auth.user) {
     return null;
   }
 
-  const firstName = state.user.user_metadata?.full_name?.split(' ')[0] || 'User';
-  const avatarUrl = state.user.user_metadata?.avatar_url;
-
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        onClick={() => setShowDropdown(!showDropdown)}
-        className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-500/5 transition-colors"
+    <div className="relative" ref={dropdownRef}>
+      <Button
+        variant="ghost"
+        className="flex items-center space-x-2"
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
       >
-        {avatarUrl && (
-          <img
-            src={avatarUrl}
-            alt={firstName}
-            className="w-8 h-8 rounded-full"
-          />
-        )}
-        <div className="flex items-center gap-1">
-          <span className="text-sm font-medium whitespace-nowrap" style={{ color: theme.colors.text.primary }}>
-            Hey {firstName}
-          </span>
-          <ChevronDown
-            size={16}
-            className={`transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`}
-            style={{ color: theme.colors.text.primary }}
-          />
-        </div>
-      </button>
+        <img
+          src={auth.user.user_metadata?.avatar_url}
+          alt={auth.user.user_metadata?.user_name || 'User avatar'}
+          className="w-6 h-6 rounded-full"
+        />
+        <span className="text-sm font-medium">{auth.user.user_metadata?.user_name}</span>
+      </Button>
 
-      {showDropdown && (
-        <div
-          className="absolute right-4 mt-2 w-48 rounded-lg shadow-lg py-1"
-          style={{ backgroundColor: theme.colors.background.secondary }}
-        >
-          <button
-            onClick={handleSignOut}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-red-500/10 transition-colors"
-            style={{ color: theme.colors.error.primary }}
-          >
-            Sign out
-          </button>
+      {isDropdownOpen && (
+        <div className={cn(
+          'absolute right-0 mt-2 w-48 rounded-md shadow-lg',
+          'bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5'
+        )}>
+          <div className="py-1" role="menu" aria-orientation="vertical">
+            <button
+              onClick={handleSignOut}
+              className={cn(
+                'block w-full px-4 py-2 text-sm text-left',
+                'text-gray-700 dark:text-gray-200',
+                'hover:bg-gray-100 dark:hover:bg-gray-700'
+              )}
+              role="menuitem"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       )}
     </div>

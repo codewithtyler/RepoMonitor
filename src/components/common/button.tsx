@@ -1,60 +1,46 @@
-import { ButtonHTMLAttributes, forwardRef } from 'react';
-import { theme } from '@/config/theme';
+import { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
 // All components are built from scratch using TailwindCSS for styling.
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'primary', disabled, children, ...props }, ref) => {
-    const baseStyles = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
-    const variantStyles = {
-      primary: {
-        default: theme.colors.brand.primary,
-        hover: theme.colors.brand.primary + 'dd',
-        disabled: theme.colors.brand.primary + '99'
-      },
-      secondary: {
-        default: theme.colors.background.secondary,
-        hover: theme.colors.background.secondary + 'dd',
-        disabled: theme.colors.background.secondary + '99'
-      },
-      outline: {
-        default: 'transparent',
-        hover: theme.colors.background.secondary + '33',
-        disabled: 'transparent'
-      }
+  ({ className = '', variant = 'primary', size = 'default', disabled = false, children, ...props }, ref) => {
+    const variantClasses: Record<ButtonVariant, string> = {
+      primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      link: 'text-primary underline-offset-4 hover:underline'
     };
 
-    const styles = variantStyles[variant];
-    const isOutline = variant === 'outline';
+    const sizeClasses: Record<ButtonSize, string> = {
+      default: 'h-10 px-4 py-2',
+      sm: 'h-9 rounded-md px-3',
+      lg: 'h-11 rounded-md px-8',
+      icon: 'h-10 w-10'
+    };
 
     return (
       <button
-        ref={ref}
-        className={`${baseStyles} ${isOutline ? 'border border-gray-300' : ''} ${className}`}
+        className={cn(
+          'inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          variantClasses[variant as ButtonVariant],
+          sizeClasses[size as ButtonSize],
+          className
+        )}
         disabled={disabled}
-        style={{
-          backgroundColor: disabled ? styles.disabled : styles.default,
-          color: theme.colors.text.primary,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.7 : 1
-        }}
+        ref={ref}
         {...props}
-        onMouseEnter={(e) => {
-          if (!disabled) {
-            (e.target as HTMLButtonElement).style.backgroundColor = styles.hover;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!disabled) {
-            (e.target as HTMLButtonElement).style.backgroundColor = styles.default;
-          }
-        }}
       >
         {children}
       </button>

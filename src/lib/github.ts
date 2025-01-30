@@ -39,7 +39,14 @@ export interface GitHubRepository {
   archived?: boolean;
   disabled?: boolean;
   subscribers_count?: number;
-  is_private?: boolean;
+  fork?: boolean;
+  source?: {
+    owner: {
+      login: string;
+    };
+    name: string;
+  };
+  private?: boolean;
 }
 
 export interface SearchOptions {
@@ -136,17 +143,26 @@ export class GitHubClientImpl implements GitHubClient {
     const searchOptions = {
       query,
       page: options.page || 1,
-      per_page: options.per_page,
-      sort: options.sort || 'stars',
+      per_page: options.per_page || 100,  // Default to 100 results
+      sort: options.sort || 'updated',
       order: options.order || 'desc'
     };
 
     logger.debug('Searching repositories:', { query: searchOptions.query, options: searchOptions });
 
+    // Build the search query according to GitHub search syntax
+    // See: https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories
+    const searchTerms = [
+      searchOptions.query,           // User's search term
+      'fork:true',                  // Include forks
+      'archived:false',             // Exclude archived repos
+      'is:public in:name in:description'  // Search in names and descriptions, public repos only
+    ];
+
     const params = new URLSearchParams({
-      q: searchOptions.query,
+      q: searchTerms.join(' '),
       page: searchOptions.page.toString(),
-      per_page: searchOptions.per_page?.toString() || '30',
+      per_page: searchOptions.per_page.toString(),
       sort: searchOptions.sort,
       order: searchOptions.order
     });
@@ -157,9 +173,9 @@ export class GitHubClientImpl implements GitHubClient {
   async listRepositories(): Promise<GitHubRepository[]> {
     const params = new URLSearchParams({
       type: 'all',
-      sort: 'created',
-      direction: 'asc',
-      per_page: '100',
+      sort: 'updated',
+      direction: 'desc',
+      per_page: '100',  // Maximum allowed per page
       page: '1'
     });
 
@@ -183,35 +199,4 @@ export class GitHubClientImpl implements GitHubClient {
 
 export async function getGitHubClient(userId: string): Promise<GitHubClient> {
   return GitHubClientImpl.create(userId);
-}
-
-export async function getRepository(owner: string, repo: string): Promise<GitHubRepository> {
-  try {
-    const token = await GitHubTokenManager.getToken();
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        // Token is invalid or expired
-        GitHubTokenManager.clearToken();
-        throw new Error('GitHub token is invalid or expired');
-      }
-      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error('[getRepository] Error:', error);
-    if (error instanceof Error && error.message.includes('token')) {
-      // Redirect to auth if token is invalid
-      const redirectUrl = new URL('/auth/callback', window.location.origin);
-      window.location.href = redirectUrl.toString();
-    }
-    throw error;
-  }
 }

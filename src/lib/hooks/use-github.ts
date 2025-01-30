@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { getAuthState, subscribeToAuth } from '../auth/global-state';
 import { useQuery } from '@tanstack/react-query';
 import { logger } from '@/lib/utils/logger';
+import { useUser } from '@/lib/auth/hooks';
 
 // Using getAuthState() from global-state instead of useUser() hook
 // to prevent multiple Supabase requests across components.
@@ -17,7 +18,7 @@ export function useGitHub() {
   useEffect(() => {
     if (!user) return;
 
-    GitHubClient.create(user.id)
+    getGitHubClient(user.id)
       .then(setClient)
       .catch(error => {
         logger.error('Failed to initialize GitHub client:', error);

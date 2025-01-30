@@ -22,7 +22,7 @@ export function useRecentAnalyses() {
             if (error) throw error;
 
             return data.map(repo => ({
-                id: `${repo.owner}/${repo.name}`,
+                id: repo.id,
                 github_id: repo.github_id,
                 owner: repo.owner,
                 name: repo.name,
@@ -36,7 +36,8 @@ export function useRecentAnalyses() {
                 hasIssues: repo.has_issues,
                 topics: repo.topics,
                 size: repo.size,
-                lastAnalysisTimestamp: repo.last_analysis_timestamp
+                lastAnalysisTimestamp: repo.last_analysis_timestamp,
+                isFork: repo.is_fork || false
             }));
         },
         staleTime: 1000 * 60 * 5 // Consider data fresh for 5 minutes

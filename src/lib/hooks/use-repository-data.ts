@@ -28,6 +28,11 @@ export interface Repository {
   topics: string[] | undefined;
   size: number | undefined;
   lastAnalysisTimestamp?: string | null;
+  isFork: boolean;
+  source?: {
+    owner: string;
+    name: string;
+  };
 }
 
 function generateRepoId(owner: string, name: string): string {
@@ -49,7 +54,12 @@ function convertGitHubRepository(repo: GitHubRepository): Repository {
     subscribersCount: repo.subscribers_count || 0,
     hasIssues: repo.has_issues,
     topics: repo.topics,
-    size: repo.size
+    size: repo.size,
+    isFork: repo.fork || false,
+    source: repo.source ? {
+      owner: repo.source.owner.login,
+      name: repo.source.name
+    } : undefined
   };
 }
 

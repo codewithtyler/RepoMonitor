@@ -1,79 +1,46 @@
-import { theme } from '@/config/theme';
-import { X } from 'lucide-react';
+import React from 'react';
+import type { Repository } from '@/lib/hooks/use-repository-data';
+import type { SearchResult } from '@/lib/contexts/search-context';
+import { GitFork } from 'lucide-react';
 
 interface RepositoryActionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTrack: () => Promise<void>;
-  onAnalyze: () => Promise<void>;
-  repository: {
-    owner: string;
-    name: string;
-    description?: string;
-    stargazersCount?: number;
-  };
+  onTrack: () => void;
+  repository: Repository | SearchResult;
 }
 
 export function RepositoryActionModal({
   isOpen,
   onClose,
   onTrack,
-  onAnalyze,
-  repository,
+  repository
 }: RepositoryActionModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative z-50 w-full max-w-md rounded-lg p-6" style={{ backgroundColor: theme.colors.background.primary }}>
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100"
-        >
-          <X className="h-4 w-4" style={{ color: theme.colors.text.secondary }} />
-        </button>
-
-        {/* Header */}
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: theme.colors.text.primary }}>
-            {repository.owner}/{repository.name}
-          </h2>
-          {repository.description && (
-            <p className="mt-2 text-sm" style={{ color: theme.colors.text.secondary }}>
-              {repository.description}
-            </p>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-[#0d1117] rounded-lg p-6 max-w-md w-full">
+        <h2 className="text-lg font-medium mb-4">Track Repository</h2>
+        <p className="text-sm mb-6">
+          Do you want to track {repository.owner}/{repository.name}?
+        </p>
+        <div className="flex justify-end gap-3">
           <button
-            onClick={onTrack}
-            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: theme.colors.background.secondary,
-              color: theme.colors.text.primary,
-            }}
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-[#c9d1d9] hover:bg-[#21262d] transition-colors"
           >
-            Track Repository
+            Cancel
           </button>
           <button
-            onClick={onAnalyze}
-            className="w-full rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            style={{
-              backgroundColor: theme.colors.brand.primary,
-              color: theme.colors.text.inverse,
+            onClick={() => {
+              onTrack();
+              onClose();
             }}
+            className="px-4 py-2 rounded-lg flex items-center gap-2 bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
           >
-            Start Analysis
+            <GitFork className="h-4 w-4" />
+            Track Repository
           </button>
         </div>
       </div>
