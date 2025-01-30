@@ -26,7 +26,7 @@ export function AuthCallback() {
   const redirectAttemptedRef = useRef(false);
   const { user, loading } = useUser();
   const tokenCheckAttempts = useRef(0);
-  const maxAttempts = 5;
+  const maxAttempts = 10;
 
   useEffect(() => {
     let mounted = true;
@@ -48,17 +48,18 @@ export function AuthCallback() {
         } else {
           tokenCheckAttempts.current++;
           if (tokenCheckAttempts.current < maxAttempts) {
+            setStatus(`Processing authentication... (attempt ${tokenCheckAttempts.current}/${maxAttempts})`);
             tokenCheckTimeout = setTimeout(checkForToken, 1000);
           } else if (mounted) {
             setError('Unable to retrieve GitHub token. Please try logging in again.');
-            setTimeout(() => navigate('/', { replace: true }), 2000);
+            setTimeout(() => navigate('/', { replace: true }), 3000);
           }
         }
       } catch (error) {
         logger.error('[AuthCallback] Error checking token:', error);
         if (mounted) {
           setError('Error processing authentication. Please try again.');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
+          setTimeout(() => navigate('/', { replace: true }), 3000);
         }
       }
     }
@@ -84,7 +85,7 @@ export function AuthCallback() {
         if (mounted) {
           setStatus('Authentication failed');
           setError(error instanceof Error ? error.message : 'Unknown error occurred');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
+          setTimeout(() => navigate('/', { replace: true }), 3000);
         }
       }
     }
@@ -97,7 +98,7 @@ export function AuthCallback() {
         clearTimeout(tokenCheckTimeout);
       }
     };
-  }, [user, loading, navigate, returnTo]);
+  }, [navigate, user, loading, returnTo]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[#0d1117]">
