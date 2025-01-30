@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 export function NotificationDropdown() {
     const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null!);
     const { notifications, loading, markAsRead, markAllAsRead, unreadCount } = useNotifications();
 
     useEffect(() => {

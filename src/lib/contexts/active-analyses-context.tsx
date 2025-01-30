@@ -32,9 +32,9 @@ export function ActiveAnalysesProvider({ children }: { children: React.ReactNode
     );
 }
 
-export function useActiveAnalyses() {
+export function useActiveAnalyses(): ActiveAnalysesContextType {
     const context = useContext(ActiveAnalysesContext);
-    if (!context) {
+    if (context === null) {
         throw new Error('useActiveAnalyses must be used within an ActiveAnalysesProvider');
     }
     return context;

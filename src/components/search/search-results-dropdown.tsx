@@ -4,8 +4,6 @@ import { getAuthState } from '@/lib/auth/global-state';
 import { theme } from '@/config/theme';
 import type { SearchResult } from '@/lib/contexts/search-context';
 
-const DISPLAY_BATCH_SIZE = 10; // Number of items to show per batch
-
 interface Props {
   query: string;
   results: SearchResult[];
@@ -18,7 +16,6 @@ interface Props {
   onClearRecentSearches: () => void;
   hasMore: boolean;
   onLoadMore: () => void;
-  onTrackRepository: (repo: SearchResult) => void;
 }
 
 export function SearchResultsDropdown({
@@ -32,11 +29,10 @@ export function SearchResultsDropdown({
   onRemoveRecentSearch,
   onClearRecentSearches,
   hasMore,
-  onLoadMore,
-  onTrackRepository
+  onLoadMore
 }: Props) {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const initUser = async () => {

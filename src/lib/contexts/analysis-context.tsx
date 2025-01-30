@@ -89,9 +89,9 @@ export function AnalysisProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
-export function useAnalysis() {
+export function useAnalysis(): AnalysisContextType {
     const context = useContext(AnalysisContext);
-    if (!context) {
+    if (context === null) {
         throw new Error('useAnalysis must be used within an AnalysisProvider');
     }
     return context;

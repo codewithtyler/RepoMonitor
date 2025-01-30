@@ -1,4 +1,4 @@
-import { GitBranch, GitMerge, GitPullRequest, AlertCircle, ArrowLeft, ChevronDown, ExternalLink } from 'lucide-react';
+import { GitBranch, GitMerge, GitPullRequest, AlertCircle, ArrowLeft, ChevronDown } from 'lucide-react';
 import { theme } from '@/config/theme';
 import { useRepositoryDetails } from '@/lib/hooks/use-repository-data';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
@@ -6,6 +6,9 @@ import { RepoStatsCard } from '@/components/common/repo-stats-card';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { OpenWithModal } from './open-with-modal';
+import { Button } from '@/components/common/button';
+import { Badge } from '@/components/common/badge';
+import { CustomScrollbar } from '@/components/common/custom-scrollbar';
 
 interface RepositoryDetailViewProps {
   owner: string;
@@ -16,10 +19,10 @@ export function RepositoryDetailView({ owner, name }: RepositoryDetailViewProps)
   const { data: repository, isLoading } = useRepositoryDetails(owner, name);
   const { analysisState, startAnalysis, clearSelection } = useAnalysis();
   const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<'analyze' | 'track'>('analyze');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isOpenWithModalVisible, setIsOpenWithModalVisible] = useState(false);
 
   useEffect(() => {

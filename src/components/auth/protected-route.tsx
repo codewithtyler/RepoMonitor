@@ -1,8 +1,7 @@
-import * as React from 'react';
+import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { LoadingSpinner } from '../common/loading-spinner';
-import { useEffect, useState } from 'react';
-import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
+import { useUser } from '@/lib/auth/hooks';
+import { Loader2 } from 'lucide-react';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -15,31 +14,22 @@ import { AuthState, subscribeToAuth } from '@/lib/auth/global-state';
 // This ensures all components share the same auth state.
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const [state, setState] = useState<AuthState>({
-    session: null,
-    user: null,
-    loading: true
-  });
+  const { user, loading } = useUser();
 
-  useEffect(() => {
-    const unsubscribe = subscribeToAuth(setState);
-    return () => unsubscribe();
-  }, []);
-
-  if (state.loading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner size={32} />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  if (!state.user) {
-    return <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

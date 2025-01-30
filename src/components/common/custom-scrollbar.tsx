@@ -1,32 +1,23 @@
-import { forwardRef } from 'react';
-import { theme } from '@/config/theme';
+import { forwardRef, type ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
-interface CustomScrollbarProps extends React.HTMLProps<HTMLDivElement> {
-    children: React.ReactNode;
+interface CustomScrollbarProps {
+    orientation?: 'vertical' | 'horizontal';
+    children?: ReactNode;
+    className?: string;
 }
 
-export const CustomScrollbar = forwardRef<HTMLDivElement, CustomScrollbarProps>(
-    ({ children, className = '', ...props }, ref) => {
-        const scrollbarStyle = {
-            scrollbarWidth: 'thin',
-            scrollbarColor: `${theme.colors.border.primary} transparent`,
-            '&::-webkit-scrollbar': {
-                width: '6px',
-            },
-            '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-            },
-            '&::-webkit-scrollbar-thumb': {
-                backgroundColor: theme.colors.border.primary,
-                borderRadius: '3px',
-            },
-        } as React.CSSProperties;
-
+export const CustomScrollbar = forwardRef<HTMLDivElement, CustomScrollbarProps & React.HTMLAttributes<HTMLDivElement>>(
+    ({ children, className = '', orientation = 'vertical', ...props }, ref) => {
         return (
             <div
                 ref={ref}
-                className={`${className}`}
-                style={{ ...scrollbarStyle, ...props.style }}
+                className={cn(
+                    'scrollbar-thin scrollbar-track-transparent',
+                    orientation === 'vertical' ? 'scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500' : '',
+                    orientation === 'horizontal' ? 'scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 dark:hover:scrollbar-thumb-gray-500' : '',
+                    className
+                )}
                 {...props}
             >
                 {children}
@@ -34,3 +25,5 @@ export const CustomScrollbar = forwardRef<HTMLDivElement, CustomScrollbarProps>(
         );
     }
 );
+
+CustomScrollbar.displayName = 'CustomScrollbar';

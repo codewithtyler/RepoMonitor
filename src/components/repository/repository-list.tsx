@@ -3,7 +3,7 @@ import type { Repository } from '@/lib/hooks/use-repository-data';
 import type { SearchResult } from '@/lib/contexts/search-context';
 import { theme } from '@/config/theme';
 import { useState } from 'react';
-import { useGitHub } from '@/lib/contexts/github-context';
+import { useGitHub } from '@/lib/hooks/use-github';
 import { Star, GitFork, GitPullRequest } from 'lucide-react';
 import { supabase } from '@/lib/auth/supabase-client';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +20,7 @@ export const RepositoryList = ({ repositories }: RepositoryListProps) => {
   const { user } = useUser();
   const { withGitHub } = useGitHub();
   const { data: repoData, isLoading } = useRepositoriesData();
-  const { createNotification } = useNotifications();
+  const { notifications } = useNotifications();
   const { handleRepositorySelect } = useRepositorySelection();
   const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
   const navigate = useNavigate();

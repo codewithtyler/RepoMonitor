@@ -1,62 +1,46 @@
-import { ButtonHTMLAttributes, forwardRef } from 'react';
-import { theme } from '@/config/theme';
+import { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
 // All components are built from scratch using TailwindCSS for styling.
 
-const variantStyles = {
-  primary: {
-    default: '#238636',
-    hover: '#2ea043',
-    disabled: '#94d3a2',
-  },
-  secondary: {
-    default: '#161b22',
-    hover: '#30363d',
-    disabled: '#8b949e',
-  },
-  outline: {
-    default: 'transparent',
-    hover: '#30363d',
-    disabled: '#8b949e',
-  },
-} as const;
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'link';
+type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
 
-type ButtonVariant = keyof typeof variantStyles;
-
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
+  size?: ButtonSize;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className = '', variant = 'primary', disabled, children, ...props }, ref) => {
-    const baseStyles = 'px-4 py-2 rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2';
-    const styles = variantStyles[variant as ButtonVariant];
-    const isOutline = variant === 'outline';
+  ({ className = '', variant = 'primary', size = 'default', disabled = false, children, ...props }, ref) => {
+    const variantClasses: Record<ButtonVariant, string> = {
+      primary: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      link: 'text-primary underline-offset-4 hover:underline'
+    };
+
+    const sizeClasses: Record<ButtonSize, string> = {
+      default: 'h-10 px-4 py-2',
+      sm: 'h-9 rounded-md px-3',
+      lg: 'h-11 rounded-md px-8',
+      icon: 'h-10 w-10'
+    };
 
     return (
       <button
-        ref={ref}
-        className={`${baseStyles} ${isOutline ? 'border border-gray-300' : ''} ${className}`}
+        className={cn(
+          'inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          variantClasses[variant as ButtonVariant],
+          sizeClasses[size as ButtonSize],
+          className
+        )}
         disabled={disabled}
-        style={{
-          backgroundColor: disabled ? styles.disabled : styles.default,
-          color: theme.colors.text.primary,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.7 : 1
-        }}
+        ref={ref}
         {...props}
-        onMouseEnter={(e) => {
-          if (!disabled) {
-            (e.target as HTMLButtonElement).style.backgroundColor = styles.hover;
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!disabled) {
-            (e.target as HTMLButtonElement).style.backgroundColor = styles.default;
-          }
-        }}
       >
         {children}
       </button>

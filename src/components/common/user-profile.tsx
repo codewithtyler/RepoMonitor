@@ -1,76 +1,78 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/lib/contexts/auth-context';
 import { supabase } from '@/lib/auth/supabase-client';
-import { useUser } from '@/lib/auth/hooks';
-import { ChevronDown } from 'lucide-react';
 import { GitHubTokenManager } from '@/lib/auth/github-token-manager';
+import { Button } from './button';
+import { cn } from '@/lib/utils';
+import type { User } from '@supabase/supabase-js';
+
+interface AuthContext {
+  user: User | null;
+  loading: boolean;
+}
 
 export function UserProfile() {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const { user } = useUser();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const auth = useAuth() as AuthContext;
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const handleSignOut = async () => {
     try {
       // Clear GitHub tokens first
-      if (user) {
-        GitHubTokenManager.clearAllTokens();
+      if (auth.user?.id) {
+        await GitHubTokenManager.clearToken(auth.user.id);
       }
 
-      // Clear all local storage data
+      // Clear local storage
       localStorage.clear();
 
       // Sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      await supabase.auth.signOut();
 
-      // Force a full page reload and redirect to home
+      // Reload the page to reset all state
       window.location.href = '/';
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  if (!user) return null;
-
-  // Get first name from full name
-  const firstName = user.user_metadata.full_name.split(' ')[0];
+  if (!auth.user) {
+    return null;
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 text-sm text-[#c9d1d9] hover:opacity-80 transition-opacity"
+      <Button
+        variant="ghost"
+        className="flex items-center space-x-2"
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
       >
         <img
-          src={user.user_metadata.avatar_url}
-          alt={user.user_metadata.full_name}
+          src={auth.user.user_metadata?.avatar_url}
+          alt={auth.user.user_metadata?.user_name || 'User avatar'}
           className="w-6 h-6 rounded-full"
         />
-        <span className="text-sm font-medium whitespace-nowrap">Hey {firstName}!</span>
-        <ChevronDown className="h-4 w-4" />
-      </button>
+        <span className="text-sm font-medium">{auth.user.user_metadata?.user_name}</span>
+      </Button>
 
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg bg-[#21262d] border border-[#30363d] z-50">
-          <div className="p-2">
+      {isDropdownOpen && (
+        <div className={cn(
+          'absolute right-0 mt-2 w-48 rounded-md shadow-lg',
+          'bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5'
+        )}>
+          <div className="py-1" role="menu" aria-orientation="vertical">
             <button
               onClick={handleSignOut}
-              className="w-full px-4 py-2 text-sm text-left text-[#f85149] hover:bg-[#f8514910] rounded transition-colors"
+              className={cn(
+                'block w-full px-4 py-2 text-sm text-left',
+                'text-gray-700 dark:text-gray-200',
+                'hover:bg-gray-100 dark:hover:bg-gray-700'
+              )}
+              role="menuitem"
             >
-              Sign Out
+              Sign out
             </button>
           </div>
         </div>

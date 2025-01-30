@@ -1,21 +1,16 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSearch } from '@/lib/contexts/search-context';
-import { useUser } from '@/lib/auth/hooks';
-import { useGitHub } from '@/lib/hooks/use-github';
-import { supabase } from '@/lib/auth/supabase-client';
-import { createNotification } from '@/lib/hooks/use-notifications';
-import type { SearchResult } from '@/lib/contexts/search-context';
-import { Spinner } from '@/components/common/spinner';
-import { SearchResultsDropdown } from './search-results-dropdown';
 import { useAnalysis } from '@/lib/contexts/analysis-context';
-import { RepositoryActionModal } from './repository-action-modal';
+import { SearchResultsDropdown } from './search-results-dropdown';
+import type { SearchResult } from '@/lib/contexts/search-context';
+import { cn } from '@/lib/utils';
 
 export const SearchBar = () => {
   const [query, setQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isInteractingWithDropdown, setIsInteractingWithDropdown] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const {
     results,
     error,

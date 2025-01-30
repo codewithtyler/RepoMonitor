@@ -9,6 +9,11 @@ declare module 'react' {
     export const useRef: <T>(initialValue: T) => { current: T };
     export const useContext: <T>(context: React.Context<T>) => T;
     export const createContext: <T>(defaultValue: T) => React.Context<T>;
+    export type ReactNode = React.ReactNode;
+    export type HTMLAttributes<T> = React.HTMLAttributes<T>;
+    export type ButtonHTMLAttributes<T> = React.ButtonHTMLAttributes<T>;
+    export type StrictMode = React.StrictMode;
+    export const forwardRef: React.ForwardRef;
 }
 
 declare global {
@@ -42,3 +47,5 @@ declare global {
         }
     }
 }
+
+export { };
