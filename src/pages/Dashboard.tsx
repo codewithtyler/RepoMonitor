@@ -179,9 +179,9 @@ export function Dashboard() {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex min-h-[calc(100vh-3.5rem)]">
         {/* Left Sidebar */}
-        <div className="w-64 border-r border-[#30363d] flex-shrink-0">
+        <div className="w-64 border-r border-[#30363d] flex-shrink-0 min-h-full bg-[#0d1117]">
           <div className="p-4 space-y-6">
             {/* Tracked Repositories Section */}
             <div>
@@ -239,7 +239,7 @@ export function Dashboard() {
 
         {/* Main Content Area */}
         <div className="flex-1 p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-7xl mx-auto">
             {selectedRepository ? (
               <RepositoryDetailView
                 repository={selectedRepository}
@@ -248,7 +248,7 @@ export function Dashboard() {
             ) : (
               <>
                 {/* Stats Grid for Dashboard View */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-16">
                   {stats.map((stat) => (
                     <div
                       key={stat.title}
@@ -284,52 +284,52 @@ export function Dashboard() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Right Panel - Only shows when repo is selected */}
-        <div
-          className={`${selectedRepository ? 'w-96 opacity-100' : 'w-0 opacity-0'
-            } border-l flex-shrink-0 transition-all duration-300 overflow-hidden`}
-          style={{ borderColor: '#30363d' }}
-        >
-          <div className="p-4 space-y-4">
-            {/* Action Buttons */}
-            <div className="space-y-2">
-              {selectedRepository && (
-                <button
-                  onClick={handleOpenWith}
-                  className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open With...
-                </button>
-              )}
-            </div>
+      {/* Right Panel - Only shows when repo is selected */}
+      <div
+        className={`${selectedRepository ? 'w-96 opacity-100' : 'w-0 opacity-0'
+          } border-l flex-shrink-0 transition-all duration-300 overflow-hidden`}
+        style={{ borderColor: '#30363d' }}
+      >
+        <div className="p-4 space-y-4">
+          {/* Action Buttons */}
+          <div className="space-y-2">
+            {selectedRepository && (
+              <button
+                onClick={handleOpenWith}
+                className="w-full px-4 py-2 rounded-lg flex items-center justify-center gap-2 bg-[#238636] text-white hover:bg-[#2ea043] transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open With...
+              </button>
+            )}
+          </div>
 
-            {/* Stats Grid for Analysis View */}
-            <div className="grid grid-cols-1 gap-4">
-              {stats.map((stat) => (
-                <div
-                  key={stat.title}
-                  className="p-4 rounded-lg bg-[#21262d] border border-[#30363d] transition-all duration-300"
-                >
-                  <h3 className="text-sm font-medium text-[#8b949e]">{stat.title}</h3>
-                  <p className="text-2xl font-bold mt-1 text-[#c9d1d9]">{stat.value}</p>
-                  <p className="text-sm text-[#8b949e] mt-1">{stat.description}</p>
-                </div>
-              ))}
-            </div>
+          {/* Stats Grid for Analysis View */}
+          <div className="grid grid-cols-1 gap-4">
+            {stats.map((stat) => (
+              <div
+                key={stat.title}
+                className="p-4 rounded-lg bg-[#21262d] border border-[#30363d] transition-all duration-300"
+              >
+                <h3 className="text-sm font-medium text-[#8b949e]">{stat.title}</h3>
+                <p className="text-2xl font-bold mt-1 text-[#c9d1d9]">{stat.value}</p>
+                <p className="text-sm text-[#8b949e] mt-1">{stat.description}</p>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Open With Modal */}
-        {selectedRepository && (
-          <OpenWithModal
-            isOpen={isOpenWithModalVisible}
-            onClose={() => setIsOpenWithModalVisible(false)}
-            repositoryUrl={`${selectedRepository.owner}/${selectedRepository.name}`}
-          />
-        )}
       </div>
+
+      {/* Open With Modal */}
+      {selectedRepository && (
+        <OpenWithModal
+          isOpen={isOpenWithModalVisible}
+          onClose={() => setIsOpenWithModalVisible(false)}
+          repositoryUrl={`${selectedRepository.owner}/${selectedRepository.name}`}
+        />
+      )}
     </div>
   );
 }

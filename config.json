@@ -1,0 +1,21 @@
+{
+    "plans": {
+        "free": {
+            "name": "Free",
+            "price": 0,
+            "analysesPerMonth": 3,
+            "features": [
+                "AI-powered issue analysis"
+            ]
+        },
+        "pro": {
+            "name": "Pro",
+            "price": 10,
+            "analysesPerMonth": 25,
+            "features": [
+                "Everything in Free",
+                "Priority analysis queue"
+            ]
+        }
+    }
+}

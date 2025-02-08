@@ -67,7 +67,8 @@ export interface SearchResponse {
 export interface GitHubClient {
   getRepository(owner: string, repo: string): Promise<GitHubRepository>;
   searchRepositories(query: string, options?: SearchOptions): Promise<SearchResponse>;
-  listRepositories(): Promise<GitHubRepository[]>;
+  listUserRepositories(): Promise<GitHubRepository[]>;
+  searchPublicRepositories(query: string, limit: number): Promise<SearchResponse>;
   listRepositoryIssues(owner: string, repo: string, options?: {
     state?: 'open' | 'closed' | 'all';
     per_page?: number;
@@ -255,46 +256,31 @@ export class GitHubClientImpl implements GitHubClient {
   }
 
   async searchRepositories(query: string, options: Partial<Omit<SearchOptions, 'query'>> = {}): Promise<SearchResponse> {
-    const searchOptions = {
-      query,
-      page: options.page || 1,
-      per_page: options.per_page || 100,  // Default to 100 results
-      sort: options.sort || 'updated',
-      order: options.order || 'desc'
-    };
-
-    logger.debug('Searching repositories:', { query: searchOptions.query, options: searchOptions });
-
-    // Build the search query according to GitHub search syntax
-    // See: https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories
-    const searchTerms = [
-      searchOptions.query,           // User's search term
-      'fork:true',                  // Include forks
-      'archived:false',             // Exclude archived repos
-      'is:public in:name in:description'  // Search in names and descriptions, public repos only
-    ];
-
     const params = new URLSearchParams({
-      q: searchTerms.join(' '),
-      page: searchOptions.page.toString(),
-      per_page: searchOptions.per_page.toString(),
-      sort: searchOptions.sort,
-      order: searchOptions.order
+      q: query,
+      sort: options.sort || 'stars',
+      order: options.order || 'desc',
+      per_page: (options.per_page || 30).toString(),
+      page: (options.page || 1).toString()
     });
 
     return this.request<SearchResponse>(`/search/repositories?${params}`);
   }
 
-  async listRepositories(): Promise<GitHubRepository[]> {
+  async listUserRepositories(): Promise<GitHubRepository[]> {
+    // Get all repositories the user has access to (including private)
+    return this.request<GitHubRepository[]>('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator');
+  }
+
+  async searchPublicRepositories(query: string, limit: number): Promise<SearchResponse> {
     const params = new URLSearchParams({
-      type: 'all',
-      sort: 'updated',
-      direction: 'desc',
-      per_page: '100',  // Maximum allowed per page
-      page: '1'
+      q: query,
+      sort: 'stars',
+      order: 'desc',
+      per_page: limit.toString()
     });
 
-    return this.request<GitHubRepository[]>(`/user/repos?${params}`);
+    return this.request<SearchResponse>(`/search/repositories?${params}`);
   }
 
   async listRepositoryIssues(owner: string, repo: string, options: {

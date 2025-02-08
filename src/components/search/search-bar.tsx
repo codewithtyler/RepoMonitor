@@ -5,6 +5,8 @@ import { SearchResultsDropdown } from './search-results-dropdown';
 import type { SearchResult } from '@/lib/contexts/search-context';
 import { cn } from '@/lib/utils';
 
+const MIN_SEARCH_CHARS = 3;  // Match the value from search-context
+
 interface SearchBarProps {
   className?: string;
 }
@@ -18,7 +20,7 @@ export const SearchBar = ({ className }: SearchBarProps) => {
   const {
     results,
     error,
-    loading: isLoading,
+    loading,
     recentSearches,
     removeRecentSearch,
     clearRecentSearches,
@@ -99,7 +101,7 @@ export const SearchBar = ({ className }: SearchBarProps) => {
           spellCheck={false}
           autoComplete="off"
         />
-        {isLoading && (
+        {(loading.userRepositories || loading.publicRepositories) && query.trim().length >= MIN_SEARCH_CHARS && (
           <div className="absolute right-3 top-2.5">
             <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#8b949e] border-t-transparent" />
           </div>
@@ -113,7 +115,7 @@ export const SearchBar = ({ className }: SearchBarProps) => {
           <SearchResultsDropdown
             query={query}
             results={results}
-            loading={isLoading}
+            loading={loading}
             error={error}
             recentSearches={recentSearches}
             onSelect={handleSelect}
@@ -124,13 +126,6 @@ export const SearchBar = ({ className }: SearchBarProps) => {
             onLoadMore={loadMore}
             onTrackRepository={() => { }}
           />
-        </div>
-      )}
-      {isDropdownOpen && query.trim().length > 0 && query.trim().length < 3 && (
-        <div className="absolute z-10 w-full mt-1 rounded-md shadow-lg overflow-hidden bg-[#0d1117] border border-[#30363d]">
-          <div className="px-3 py-2 text-sm text-[#8b949e]">
-            Please enter at least 3 characters to search
-          </div>
         </div>
       )}
     </div>

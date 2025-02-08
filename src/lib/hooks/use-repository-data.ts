@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getAuthState } from '@/lib/auth/global-state';
 import { getGitHubClient, type GitHubRepository } from '@/lib/github';
+import { logger } from '@/lib/utils/logger';
 
 // Note: This project uses plain React + TailwindCSS.
 // We intentionally avoid Next.js, Shadcn UI, and Radix UI.
@@ -94,7 +95,9 @@ export function useRepositoriesData() {
       }
 
       const client = await getGitHubClient(state.user.id);
-      const repositories = await client.listRepositories();
+      logger.debug('Fetching repositories');
+      const repositories = await client.listUserRepositories();
+      logger.debug('Repositories fetched successfully', { count: repositories.length });
       return repositories.map(convertGitHubRepository);
     }
   });

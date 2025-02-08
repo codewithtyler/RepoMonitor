@@ -26,9 +26,14 @@ export interface SearchResult {
 export interface SearchContextType {
   query: string;
   setQuery: (query: string) => void;
-  results: SearchResult[];
-  allResults: SearchResult[];
-  loading: boolean;
+  results: {
+    userRepositories: SearchResult[];
+    publicRepositories: SearchResult[];
+  };
+  loading: {
+    userRepositories: boolean;
+    publicRepositories: boolean;
+  };
   error: Error | null;
   recentSearches: SearchResult[];
   removeRecentSearch: (id: number) => void;
@@ -45,9 +50,14 @@ export interface SearchContextType {
 const defaultContext: SearchContextType = {
   query: '',
   setQuery: () => { },
-  results: [],
-  allResults: [],
-  loading: false,
+  results: {
+    userRepositories: [],
+    publicRepositories: []
+  },
+  loading: {
+    userRepositories: false,
+    publicRepositories: false
+  },
   error: null,
   recentSearches: [],
   removeRecentSearch: () => { },
@@ -67,6 +77,7 @@ const MAX_RECENT_SEARCHES = 5;
 const DISPLAY_BATCH_SIZE = 10;  // Number of results to show per batch
 const CACHE_DURATION = 300000;  // Cache duration (5 minutes)
 const MIN_SEARCH_CHARS = 3;  // Minimum characters required for search
+const MAX_TOTAL_RESULTS = 30;  // Maximum total results allowed
 
 interface CachedResults {
   query: string;
@@ -124,8 +135,14 @@ function convertGitHubRepository(repo: GitHubRepository): SearchResult {
 
 export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<SearchContextType['results']>({
+    userRepositories: [],
+    publicRepositories: []
+  });
+  const [loading, setLoading] = useState<SearchContextType['loading']>({
+    userRepositories: false,
+    publicRepositories: false
+  });
   const [error, setError] = useState<Error | null>(null);
   const [recentSearches, setRecentSearches] = useState<SearchResult[]>(getRecentSearches());
   const [hasMore, setHasMore] = useState(false);
@@ -141,16 +158,12 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     initUser();
   }, []);
 
-  const loadMore = useCallback(() => {
-    if (!hasMore) return;
-    const nextCount = Math.min(displayedCount + DISPLAY_BATCH_SIZE, results.length);
-    setDisplayedCount(nextCount);
-    setHasMore(nextCount < results.length);
-  }, [displayedCount, results.length, hasMore]);
-
   const clearSearch = useCallback(() => {
     setQuery('');
-    setResults([]);
+    setResults({
+      userRepositories: [],
+      publicRepositories: []
+    });
     setError(null);
     setHasMore(false);
     setDisplayedCount(0);
@@ -164,18 +177,9 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setLoading(true);
+      // Step 1: Search user repositories
+      setLoading(prev => ({ ...prev, userRepositories: true }));
       setError(null);
-
-      // Check cache first
-      if (isCacheValid(searchCacheRef.current, searchQuery)) {
-        const cache = searchCacheRef.current!;
-        setResults(cache.results);
-        setDisplayedCount(DISPLAY_BATCH_SIZE);
-        setHasMore(cache.results.length > DISPLAY_BATCH_SIZE);
-        setLoading(false);
-        return;
-      }
 
       const state = await getAuthState();
       if (!state.user) {
@@ -183,41 +187,57 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
       }
 
       const client = await getGitHubClient(state.user.id);
-      const searchResults = await client.searchRepositories(searchQuery);
 
-      // Format and sort results
-      const formattedResults = searchResults.items.map(convertGitHubRepository);
-      const uniqueResults = Array.from(new Map(formattedResults.map(item => [item.id, item])).values());
-      const sortedResults = uniqueResults.sort((a, b) => {
-        // First, prioritize user's repositories
-        const isUserRepoA = a.owner === currentUser;
-        const isUserRepoB = b.owner === currentUser;
-        if (isUserRepoA && !isUserRepoB) return -1;
-        if (!isUserRepoA && isUserRepoB) return 1;
+      // Get all user repositories first
+      const userRepos = await client.listUserRepositories();
+      const matchingUserRepos = userRepos
+        .map(convertGitHubRepository)
+        .filter(repo =>
+          repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          repo.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        );
 
-        // Then sort by stars
-        return b.stargazersCount - a.stargazersCount;
-      });
+      setResults(prev => ({
+        ...prev,
+        userRepositories: matchingUserRepos
+      }));
+      setLoading(prev => ({ ...prev, userRepositories: false }));
 
-      setResults(sortedResults);
-      setDisplayedCount(Math.min(DISPLAY_BATCH_SIZE, sortedResults.length));
-      setHasMore(sortedResults.length > DISPLAY_BATCH_SIZE);
+      // Step 2: Search public repositories if needed
+      if (matchingUserRepos.length < MAX_TOTAL_RESULTS) {
+        setLoading(prev => ({ ...prev, publicRepositories: true }));
+        const remainingSlots = MAX_TOTAL_RESULTS - matchingUserRepos.length;
 
-      // Update cache
-      searchCacheRef.current = {
-        query: searchQuery,
-        results: sortedResults,
-        displayedCount: DISPLAY_BATCH_SIZE,
-        timestamp: Date.now(),
-        hasMore: sortedResults.length > DISPLAY_BATCH_SIZE,
-        page: 1
-      };
+        const publicSearchResponse = await client.searchPublicRepositories(searchQuery, remainingSlots);
+        const publicRepos = publicSearchResponse.items
+          .map(convertGitHubRepository)
+          // Filter out any repos that are already in user repos
+          .filter(repo => !matchingUserRepos.some(userRepo => userRepo.id === repo.id));
+
+        setResults(prev => ({
+          ...prev,
+          publicRepositories: publicRepos
+        }));
+
+        setHasMore(publicRepos.length > DISPLAY_BATCH_SIZE);
+        setDisplayedCount(Math.min(DISPLAY_BATCH_SIZE, publicRepos.length));
+      }
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to search repositories'));
     } finally {
-      setLoading(false);
+      setLoading({
+        userRepositories: false,
+        publicRepositories: false
+      });
     }
-  }, [clearSearch, currentUser]);
+  }, [clearSearch]);
+
+  const loadMore = useCallback(() => {
+    if (!hasMore) return;
+    const nextCount = Math.min(displayedCount + DISPLAY_BATCH_SIZE, results.publicRepositories.length);
+    setDisplayedCount(nextCount);
+    setHasMore(nextCount < results.publicRepositories.length);
+  }, [displayedCount, results.publicRepositories.length, hasMore]);
 
   const selectResult = useCallback((result: SearchResult) => {
     setRecentSearches(prev => {
@@ -261,8 +281,7 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const value = {
     query,
     setQuery,
-    results: results.slice(0, displayedCount),
-    allResults: results,
+    results,
     loading,
     error,
     recentSearches,

@@ -4,7 +4,7 @@ import { supabase } from '@/lib/auth/supabase-client';
 import { useUser } from '@/lib/auth/hooks';
 import { theme } from '@/config/theme';
 import { GitFork, ArrowRight } from 'lucide-react';
-import { LoadingSpinner } from '../components/common/loading-spinner';
+import { Spinner } from '../components/common/spinner';
 
 interface TrackedRepository {
   id: string;
@@ -47,7 +47,7 @@ export function TrackedPage() {
   };
 
   if (loading) {
-    return <LoadingSpinner />;
+    return <Spinner size="lg" />;
   }
 
   return (
@@ -92,4 +92,4 @@ export function TrackedPage() {
       </div>
     </>
   );
-} 
+}

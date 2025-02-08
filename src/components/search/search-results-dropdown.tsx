@@ -6,8 +6,14 @@ import type { SearchResult } from '@/lib/contexts/search-context';
 
 interface Props {
   query: string;
-  results: SearchResult[];
-  loading: boolean;
+  results: {
+    userRepositories: SearchResult[];
+    publicRepositories: SearchResult[];
+  };
+  loading: {
+    userRepositories: boolean;
+    publicRepositories: boolean;
+  };
   error: Error | null;
   recentSearches: SearchResult[];
   onSelect: (result: SearchResult) => void;
@@ -53,12 +59,14 @@ export function SearchResultsDropdown({
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!dropdownRef.current) return;
 
+    const allResults = [...results.userRepositories, ...results.publicRepositories];
+
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
         setSelectedIndex(prev => {
           const next = prev + 1;
-          const max = results.length - 1;
+          const max = allResults.length - 1;
           const newIndex = next > max ? 0 : next;
           itemRefs.current[newIndex]?.scrollIntoView({ block: 'nearest' });
           return newIndex;
@@ -68,7 +76,7 @@ export function SearchResultsDropdown({
         e.preventDefault();
         setSelectedIndex(prev => {
           const next = prev - 1;
-          const max = results.length - 1;
+          const max = allResults.length - 1;
           const newIndex = next < 0 ? max : next;
           itemRefs.current[newIndex]?.scrollIntoView({ block: 'nearest' });
           return newIndex;
@@ -77,7 +85,7 @@ export function SearchResultsDropdown({
       case 'Enter':
         e.preventDefault();
         if (selectedIndex >= 0) {
-          const selectedRepo = results[selectedIndex];
+          const selectedRepo = allResults[selectedIndex];
           if (selectedRepo) {
             onSelect(selectedRepo);
           }
@@ -92,7 +100,7 @@ export function SearchResultsDropdown({
   }, [handleKeyDown]);
 
   const handleScroll = useCallback(() => {
-    if (!dropdownRef.current || loading || !hasMore) return;
+    if (!dropdownRef.current || loading.publicRepositories || !hasMore) return;
 
     const { scrollTop, scrollHeight, clientHeight } = dropdownRef.current;
     const threshold = 50; // pixels from bottom
@@ -100,7 +108,7 @@ export function SearchResultsDropdown({
     if (scrollHeight - scrollTop - clientHeight < threshold) {
       onLoadMore();
     }
-  }, [loading, hasMore, onLoadMore]);
+  }, [loading.publicRepositories, hasMore, onLoadMore]);
 
   useEffect(() => {
     const dropdown = dropdownRef.current;
@@ -112,8 +120,8 @@ export function SearchResultsDropdown({
 
   if (error) {
     return (
-      <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg overflow-hidden" style={{ backgroundColor: theme.colors.background.secondary }}>
-        <div className="px-3 py-2 text-sm" style={{ color: theme.colors.text.error }}>
+      <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg overflow-hidden bg-[#0d1117] border border-[#30363d]">
+        <div className="px-3 py-2 text-sm text-[#f85149]">
           {error.message}
         </div>
       </div>
@@ -185,14 +193,6 @@ export function SearchResultsDropdown({
     return null;
   };
 
-  // Limit total results to 30, prioritizing owned repositories
-  const ownedRepos = results.filter(repo => repo.owner === currentUser);
-  const otherRepos = results.filter(repo => repo.owner !== currentUser);
-  const totalAllowed = 30;
-  const ownedCount = ownedRepos.length;
-  const otherCount = Math.min(otherRepos.length, totalAllowed - ownedCount);
-  const limitedOtherRepos = otherRepos.slice(0, otherCount);
-
   return (
     <div
       ref={dropdownRef}
@@ -201,44 +201,73 @@ export function SearchResultsDropdown({
     >
       <div className="py-2">
         {query ? (
-          // Search Results
-          results.length > 0 ? (
-            <>
-              {/* Owned Repositories */}
-              {ownedRepos.length > 0 && (
-                <>
-                  <div className="px-3 py-1.5">
-                    <div className="text-xs font-medium text-[#8b949e]">
-                      Owned
+          <>
+            {/* Show min chars message when query is too short */}
+            {query.trim().length < 3 ? (
+              <div className="px-4 py-3 text-sm text-[#8b949e]">
+                <p className="mb-2">Please enter at least 3 characters</p>
+                <p className="text-xs">Type a few more characters to start searching repositories.</p>
+              </div>
+            ) : (loading.userRepositories || loading.publicRepositories) ? (
+              <div className="px-4 py-3 text-sm text-[#8b949e]">
+                <p className="mb-2">Searching repositories...</p>
+                <p className="text-xs">We'll show results from your repositories and public repositories.</p>
+              </div>
+            ) : (
+              <>
+                {/* User Repositories Section */}
+                {results.userRepositories.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5">
+                      <div className="text-xs font-medium text-[#8b949e]">
+                        Your Repositories
+                      </div>
                     </div>
-                  </div>
-                  {renderBatchSeparator(0)}
-                  {ownedRepos.map((repo, index) => renderRepositoryItem(repo, index))}
-                </>
-              )}
+                    {results.userRepositories.map((repo, index) => renderRepositoryItem(repo, index))}
+                  </>
+                )}
 
-              {/* Other Repositories */}
-              {limitedOtherRepos.length > 0 && (
-                <>
+                {/* Public Repositories Section */}
+                {results.userRepositories.length > 0 && results.publicRepositories.length > 0 && (
                   <div className="relative px-3 py-2">
                     <div className="absolute inset-0 flex items-center px-3">
                       <div className="w-full h-px bg-[#30363d]" />
                     </div>
                     <div className="relative flex justify-center">
                       <span className="px-2 text-xs font-medium bg-[#0d1117] text-[#8b949e]">
-                        All Results
+                        Other Results
                       </span>
                     </div>
                   </div>
-                  {limitedOtherRepos.map((repo, index) => renderRepositoryItem(repo, index + ownedCount))}
-                </>
-              )}
-            </>
-          ) : !loading && (
-            <div className="px-3 py-2 text-sm text-[#8b949e]">
-              No repositories found
-            </div>
-          )
+                )}
+
+                {results.publicRepositories.length > 0 && (
+                  <>
+                    {results.publicRepositories.map((repo, index) => (
+                      <>
+                        {renderBatchSeparator(index)}
+                        {renderRepositoryItem(repo, index + results.userRepositories.length)}
+                      </>
+                    ))}
+                  </>
+                )}
+
+                {/* No Results Message */}
+                {results.userRepositories.length === 0 && results.publicRepositories.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-[#8b949e]">
+                    No repositories found
+                  </div>
+                )}
+
+                {/* Footer Message */}
+                {(results.userRepositories.length > 0 || results.publicRepositories.length > 0) && (
+                  <div className="px-3 py-2 text-center text-sm text-[#8b949e]">
+                    End of results.
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : recentSearches.length > 0 ? (
           // Recent Searches
           <>
@@ -247,35 +276,19 @@ export function SearchResultsDropdown({
                 Recent Searches
               </div>
               <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onClearRecentSearches();
-                }}
-                className="text-xs text-[#8b949e] hover:text-[#c9d1d9] transition-colors"
+                onClick={onClearRecentSearches}
+                className="text-xs text-[#8b949e] hover:text-[#c9d1d9]"
               >
                 Clear All
               </button>
             </div>
-            {recentSearches.slice(0, 5).map((repo, index) => renderRepositoryItem(repo, index, true))}
+            {recentSearches.map((repo, index) => renderRepositoryItem(repo, index, true))}
           </>
         ) : (
-          // Default message when no history and no search
+          // Default welcome message when no history and no search
           <div className="px-4 py-3 text-sm text-[#8b949e]">
             <p className="mb-2">Welcome to Repository Search!</p>
             <p className="text-xs">Start typing to search for repositories. Your recent searches will appear here.</p>
-          </div>
-        )}
-
-        {loading && (
-          <div className="px-3 py-2 flex justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#8b949e] border-t-transparent" />
-          </div>
-        )}
-
-        {!loading && !hasMore && results.length > 0 && (
-          <div className="px-3 py-2 text-xs text-center text-[#8b949e]">
-            End of results
           </div>
         )}
       </div>

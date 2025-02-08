@@ -30,7 +30,8 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-    'process.env': {}
+    'process.env': {},
+    __WS_TOKEN__: JSON.stringify('development')
   },
   optimizeDeps: {
     include: ['stream', 'util'],
