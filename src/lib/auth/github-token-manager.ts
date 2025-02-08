@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/auth/supabase-client';
 import { logger } from '@/lib/utils/logger';
+import { CookieManager } from '@/lib/utils/cookie-manager';
 
 const TOKEN_STORAGE_KEY = 'github_token';
 
@@ -64,6 +65,8 @@ export class GitHubTokenManager {
           // Store the token for future use
           try {
             await this.storeToken(userId, cleanProviderToken);
+            // Also store in cookie as fallback
+            CookieManager.setGitHubToken(cleanProviderToken);
           } catch (error) {
             logger.error('[GitHubTokenManager] Failed to store provider token:', error);
             // Continue using the provider token even if storage fails
@@ -87,11 +90,23 @@ export class GitHubTokenManager {
 
       if (dbError) {
         logger.error('[GitHubTokenManager] Database error:', dbError);
+        // Try cookie fallback before retry
+        const cookieToken = CookieManager.getGitHubToken();
+        if (cookieToken && this.validateToken(cookieToken)) {
+          logger.info('[GitHubTokenManager] Using token from cookie');
+          return cookieToken;
+        }
         return this.handleRetry(userId, retryCount, 'database error');
       }
 
       if (!tokenData?.token) {
         logger.error('[GitHubTokenManager] No token found in database');
+        // Try cookie fallback before retry
+        const cookieToken = CookieManager.getGitHubToken();
+        if (cookieToken && this.validateToken(cookieToken)) {
+          logger.info('[GitHubTokenManager] Using token from cookie');
+          return cookieToken;
+        }
         return this.handleRetry(userId, retryCount, 'no token in database');
       }
 
@@ -101,21 +116,41 @@ export class GitHubTokenManager {
 
       if (decryptError) {
         logger.error('[GitHubTokenManager] Token decryption failed:', decryptError);
+        // Try cookie fallback before retry
+        const cookieToken = CookieManager.getGitHubToken();
+        if (cookieToken && this.validateToken(cookieToken)) {
+          logger.info('[GitHubTokenManager] Using token from cookie');
+          return cookieToken;
+        }
         return this.handleRetry(userId, retryCount, 'decryption error');
       }
 
       const cleanDecryptedToken = decryptedToken?.trim();
       if (!cleanDecryptedToken || !this.validateToken(cleanDecryptedToken)) {
         logger.error('[GitHubTokenManager] Decrypted token is invalid');
+        // Try cookie fallback before retry
+        const cookieToken = CookieManager.getGitHubToken();
+        if (cookieToken && this.validateToken(cookieToken)) {
+          logger.info('[GitHubTokenManager] Using token from cookie');
+          return cookieToken;
+        }
         // Remove invalid token from database
         await this.clearToken(userId);
         return this.handleRetry(userId, retryCount, 'invalid decrypted token');
       }
 
       logger.info('[GitHubTokenManager] Successfully retrieved token from database');
+      // Store in cookie as fallback
+      CookieManager.setGitHubToken(cleanDecryptedToken);
       return cleanDecryptedToken;
     } catch (error) {
       logger.error('[GitHubTokenManager] Error getting token:', error);
+      // Try cookie fallback before retry
+      const cookieToken = CookieManager.getGitHubToken();
+      if (cookieToken && this.validateToken(cookieToken)) {
+        logger.info('[GitHubTokenManager] Using token from cookie');
+        return cookieToken;
+      }
       return this.handleRetry(userId, retryCount, 'unexpected error');
     }
   }
@@ -172,6 +207,9 @@ export class GitHubTokenManager {
         throw error;
       }
 
+      // Also store in cookie as fallback
+      CookieManager.setGitHubToken(token);
+
       logger.info('[GitHubTokenManager] Token stored successfully');
     } catch (error) {
       logger.error('[GitHubTokenManager] Error storing token:', error);
@@ -197,6 +235,9 @@ export class GitHubTokenManager {
         logger.error('[GitHubTokenManager] Error clearing token from database:', error);
         throw error;
       }
+
+      // Also clear cookie
+      CookieManager.clearGitHubToken();
 
       logger.info('[GitHubTokenManager] Token cleared successfully');
     } catch (error) {
